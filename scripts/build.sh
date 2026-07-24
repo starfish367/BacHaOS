@@ -55,6 +55,8 @@ xorriso -as mkisofs \
   -no-emul-boot -isohybrid-gpt-basdat \
   -o output/bac-ha-os-${EDITION}-${VERSION}-$(date +%Y%m%d).iso \
   $EXTRACT
+  chroot $EXTRACT/squashfs-root bash -c "dbus-launch flatpak list --app --columns=application,name,version,size" \
+  > output/flatpak-apps-$EDITION.txt 2>/dev/null || echo "Flatpak list lỗi, cần kiểm tra thủ công" > output/flatpak-apps-$EDITION.txt
   # === Liệt kê app cài qua Flatpak (nếu ISO gốc có sẵn Flatpak) ===
 if chroot $EXTRACT/squashfs-root which flatpak &>/dev/null; then
   chroot $EXTRACT/squashfs-root flatpak list --app \
