@@ -6,7 +6,6 @@ apport
 apport-gtk
 kerneloops
 modemmanager
-bluez
 avahi-daemon
 mint-common-l10n
 onboard
