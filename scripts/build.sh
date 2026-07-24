@@ -55,3 +55,14 @@ xorriso -as mkisofs \
   -no-emul-boot -isohybrid-gpt-basdat \
   -o output/bac-ha-os-${EDITION}-${VERSION}-$(date +%Y%m%d).iso \
   $EXTRACT
+  # === Liệt kê app cài qua Flatpak (nếu ISO gốc có sẵn Flatpak) ===
+if chroot $EXTRACT/squashfs-root which flatpak &>/dev/null; then
+  chroot $EXTRACT/squashfs-root flatpak list --app \
+    --columns=application,name,version,size \
+    > output/flatpak-apps-$EDITION.txt 2>/dev/null || true
+
+  echo "=== Flatpak apps đã cài sẵn ($EDITION) ==="
+  cat output/flatpak-apps-$EDITION.txt
+else
+  echo "Không có Flatpak trong ISO gốc ($EDITION)" > output/flatpak-apps-$EDITION.txt
+fi
