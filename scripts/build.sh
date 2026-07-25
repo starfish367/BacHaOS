@@ -68,3 +68,13 @@ if chroot $EXTRACT/squashfs-root which flatpak &>/dev/null; then
 else
   echo "Không có Flatpak trong ISO gốc ($EDITION)" > output/flatpak-apps-$EDITION.txt
 fi
+
+# === Overlay: Zalo Web shortcut ===
+mkdir -p $EXTRACT/squashfs-root/opt/zalo
+cp assets/zalo/logo-zalo-vector-03.png $EXTRACT/squashfs-root/opt/zalo/
+cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/usr/share/applications/
+
+# Đưa thêm ra Desktop mặc định (thư mục skel = áp dụng cho user mới tạo lúc cài)
+mkdir -p $EXTRACT/squashfs-root/etc/skel/Desktop
+cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
+chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/zalo.desktop
