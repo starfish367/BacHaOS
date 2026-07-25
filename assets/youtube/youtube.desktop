@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=YouTube
+Comment=Xem video YouTube
+Exec=google-chrome-stable --app=https://youtube.com --class=YouTube
+Icon=/opt/youtube/youtube.png
+Terminal=false
+Type=Application
+Categories=Network;AudioVideo;
+StartupWMClass=YouTube
