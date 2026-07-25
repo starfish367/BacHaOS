@@ -94,3 +94,7 @@ echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-
 apt-get install -y flatpak
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
 flatpak install -y flathub com.usebottles.bottles
+
+# --- Tạo file mẫu trống cho OnlyOffice (Word/Excel/PowerPoint) ---
+mkdir -p /opt/onlyoffice-templates
+onlyoffice-desktopeditors --headless --new=docx --output=/opt/onlyoffice-templates/blank.docx 2>/dev/null || true
