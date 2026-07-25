@@ -89,3 +89,8 @@ wget -qO- https://dl.winehq.org/wine-builds/winehq.key \
   | gpg --dearmor -o /usr/share/keyrings/winehq.gpg
 echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
   > /etc/apt/sources.list.d/winehq.list
+
+# --- Cài Bottles qua Flatpak (không có trong apt repo) ---
+apt-get install -y flatpak
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install -y flathub com.usebottles.bottles
