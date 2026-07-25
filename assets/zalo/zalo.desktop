@@ -2,7 +2,7 @@
 Name=Zalo
 Comment=Ứng dụng nhắn tin Zalo (Web)
 Exec=google-chrome-stable --app=https://chat.zalo.me --class=Zalo
-Icon=/opt/zalo/zalo.png
+Icon=/opt/zalo/logo-zalo-vector-03.png
 Terminal=false
 Type=Application
 Categories=Network;InstantMessaging;
