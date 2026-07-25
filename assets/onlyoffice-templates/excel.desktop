@@ -1,0 +1,9 @@
+# excel.desktop
+[Desktop Entry]
+Name=ONLYOFFICE Bảng tính
+Comment=Bảng tính (giống Excel)
+Exec=/opt/onlyoffice-templates/open-excel.sh
+Icon=onlyoffice-desktopeditors
+Terminal=false
+Type=Application
+Categories=Office;Spreadsheet;
