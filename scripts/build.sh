@@ -24,7 +24,7 @@ cp config/packages.list $EXTRACT/squashfs-root/tmp/
 cp config/remove-$EDITION.list $EXTRACT/squashfs-root/tmp/remove.list
 chroot $EXTRACT/squashfs-root /bin/bash /tmp/customize.sh "$VERSION" "$EDITION"
 
-rm $EXTRACT/squashfs-root/tmp/customize.sh
+rm -f $EXTRACT/squashfs-root/tmp/customize.sh
 
 # === Liệt kê app Flatpak (chạy TRƯỚC khi umount, còn trong chroot) ===
 if chroot $EXTRACT/squashfs-root which flatpak &>/dev/null; then
