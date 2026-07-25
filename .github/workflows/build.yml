@@ -42,6 +42,14 @@ jobs:
 
       - name: Download Mint ISO (${{ matrix.edition.name }})
         run: wget -q "${{ matrix.edition.iso_url }}" -O mint-base.iso
+      - name: Show installed packages
+        run: cat output/installed-packages-*.txt
+
+      - name: Upload package list
+        uses: actions/upload-artifact@v4
+        with:
+          name: installed-packages-${{ matrix.edition.name }}
+          path: output/installed-packages-*.txt
 
       - name: Run remaster script
         run: |
