@@ -85,3 +85,37 @@ cp assets/youtube/youtube.png $EXTRACT/squashfs-root/opt/youtube/
 cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/usr/share/applications/
 cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
 chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/youtube.desktop
+
+# === Overlay: tất cả shortcut ra Desktop ===
+mkdir -p $EXTRACT/squashfs-root/etc/skel/Desktop
+
+# --- Zalo ---
+mkdir -p $EXTRACT/squashfs-root/opt/zalo
+cp assets/zalo/logo-zalo-vector-03.png $EXTRACT/squashfs-root/opt/zalo/
+cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/usr/share/applications/
+cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
+
+# --- YouTube ---
+mkdir -p $EXTRACT/squashfs-root/opt/youtube
+cp assets/youtube/youtube.png $EXTRACT/squashfs-root/opt/youtube/
+cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/usr/share/applications/
+cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
+
+# --- OnlyOffice Word/Excel/PowerPoint ---
+mkdir -p $EXTRACT/squashfs-root/opt/onlyoffice-templates
+cp assets/onlyoffice-templates/blank.docx $EXTRACT/squashfs-root/opt/onlyoffice-templates/
+cp assets/onlyoffice-templates/blank.xlsx $EXTRACT/squashfs-root/opt/onlyoffice-templates/
+cp assets/onlyoffice-templates/blank.pptx $EXTRACT/squashfs-root/opt/onlyoffice-templates/
+cp assets/onlyoffice-templates/open-word.sh $EXTRACT/squashfs-root/opt/onlyoffice-templates/
+cp assets/onlyoffice-templates/open-excel.sh $EXTRACT/squashfs-root/opt/onlyoffice-templates/
+cp assets/onlyoffice-templates/open-powerpoint.sh $EXTRACT/squashfs-root/opt/onlyoffice-templates/
+chmod +x $EXTRACT/squashfs-root/opt/onlyoffice-templates/open-*.sh
+cp assets/onlyoffice-templates/*.desktop $EXTRACT/squashfs-root/usr/share/applications/
+cp assets/onlyoffice-templates/*.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
+
+# --- Chrome (đã có sẵn .desktop từ apt, chỉ copy ra Desktop) ---
+cp $EXTRACT/squashfs-root/usr/share/applications/google-chrome.desktop \
+  $EXTRACT/squashfs-root/etc/skel/Desktop/ 2>/dev/null || true
+
+# Cấp quyền thực thi cho toàn bộ shortcut trên Desktop
+chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/*.desktop
