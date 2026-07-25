@@ -45,10 +45,15 @@ apt-get install -y google-chrome-stable
 apt-get install -y fcitx5 fcitx5-unikey fcitx5-config-qt
 im-config -n fcitx5
 
-# --- Cài Bottles qua Flatpak ---
+# --- Codec đa phương tiện (nghe nhạc, xem video định dạng phổ biến) ---
+apt-get install -y ubuntu-restricted-extras || \
+apt-get install -y gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+  gstreamer1.0-plugins-ugly gstreamer1.0-libav ffmpeg
+
+# --- Cài sẵn Flatpak + Flathub remote (để user tự cài Bottles/app khác sau nếu cần) ---
 apt-get install -y flatpak
 flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install -y flathub com.usebottles.bottles || echo "Flatpak install bỏ qua, cài thủ công sau khi boot"
+# Không cài Bottles sẵn — để ISO nhẹ, user tự cài qua Software Manager khi cần
 
 # --- Set Chrome làm trình duyệt mặc định ---
 xdg-settings set default-web-browser google-chrome.desktop || true
