@@ -10,13 +10,14 @@ update-locale LANG=vi_VN.UTF-8
 ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
 echo "Asia/Ho_Chi_Minh" > /etc/timezone
 
-# --- Chấp nhận EULA font Microsoft tự động (tránh build đứng lại chờ input) ---
+# --- Chấp nhận EULA font Microsoft tự động ---
 echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" \
   | debconf-set-selections
 
-# --- Thêm repo OnlyOffice ---
 apt-get update
 apt-get install -y wget gnupg
+
+# --- Thêm repo OnlyOffice ---
 wget -qO- https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE \
   | gpg --dearmor -o /usr/share/keyrings/onlyoffice.gpg
 echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" \
@@ -28,19 +29,32 @@ wget -qO- https://dl.google.com/linux/linux_signing_key.pub \
 echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
   > /etc/apt/sources.list.d/google-chrome.list
 
+# --- Thêm repo WineHQ (noble = Ubuntu 24.04, base Mint 22) ---
+dpkg --add-architecture i386
+wget -qO- https://dl.winehq.org/wine-builds/winehq.key \
+  | gpg --dearmor -o /usr/share/keyrings/winehq.gpg
+echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ noble main" \
+  > /etc/apt/sources.list.d/winehq.list
+
+# --- Update 1 lần duy nhất sau khi đã thêm ĐỦ cả 3 repo ---
 apt-get update
+
+# --- Cài toàn bộ gói (1 lần duy nhất) ---
 xargs -a /tmp/packages.list apt-get install -y
 apt-get install -y google-chrome-stable
-
-# --- Bộ gõ tiếng Việt: fcitx5-unikey ---
 apt-get install -y fcitx5 fcitx5-unikey fcitx5-config-qt
 im-config -n fcitx5
 
-# --- Set Chrome làm trình duyệt mặc định, giữ Firefox song song ---
+# --- Cài Bottles qua Flatpak ---
+apt-get install -y flatpak
+flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak install -y flathub com.usebottles.bottles || echo "Flatpak install bỏ qua, cài thủ công sau khi boot"
+
+# --- Set Chrome làm trình duyệt mặc định ---
 xdg-settings set default-web-browser google-chrome.desktop || true
 update-alternatives --set x-www-browser /usr/bin/google-chrome-stable || true
 
-# --- Font Unicode tiếng Việt mặc định ---
+# --- Font cache ---
 fc-cache -f -v
 
 # --- Gỡ gói theo remove list ---
@@ -74,7 +88,7 @@ sed -i "s/127.0.1.1.*/127.0.1.1\tbac-ha-os/" /etc/hosts
 sed -i "s/^PRETTY_NAME=.*/PRETTY_NAME=\"Bạc Hà OS ${VERSION} (${EDITION^})\"/" /etc/os-release
 sed -i "s/^NAME=.*/NAME=\"Bạc Hà OS\"/" /etc/os-release
 
-# --- Dọn file thừa ---
+# --- Dọn file thừa (LUÔN LÀ BƯỚC CUỐI CÙNG, sau khi đã cài hết mọi thứ) ---
 rm -rf /usr/share/doc/* /usr/share/man/* /var/cache/fontconfig/*
 find /usr/share/locale -mindepth 1 -maxdepth 1 \
   ! -name 'vi*' ! -name 'en*' -exec rm -rf {} +
@@ -82,19 +96,3 @@ find /usr/share/locale -mindepth 1 -maxdepth 1 \
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 rm -f /var/log/*.log
-
-# --- Thêm repo WineHQ (bản ổn định, tương thích tốt nhất) ---
-dpkg --add-architecture i386
-wget -qO- https://dl.winehq.org/wine-builds/winehq.key \
-  | gpg --dearmor -o /usr/share/keyrings/winehq.gpg
-echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
-  > /etc/apt/sources.list.d/winehq.list
-
-# --- Cài Bottles qua Flatpak (không có trong apt repo) ---
-apt-get install -y flatpak
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-flatpak install -y flathub com.usebottles.bottles
-
-# --- Tạo file mẫu trống cho OnlyOffice (Word/Excel/PowerPoint) ---
-mkdir -p /opt/onlyoffice-templates
-onlyoffice-desktopeditors --headless --new=docx --output=/opt/onlyoffice-templates/blank.docx 2>/dev/null || true
