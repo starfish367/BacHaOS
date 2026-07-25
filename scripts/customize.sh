@@ -82,3 +82,10 @@ find /usr/share/locale -mindepth 1 -maxdepth 1 \
 apt-get clean
 rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 rm -f /var/log/*.log
+
+# --- Thêm repo WineHQ (bản ổn định, tương thích tốt nhất) ---
+dpkg --add-architecture i386
+wget -qO- https://dl.winehq.org/wine-builds/winehq.key \
+  | gpg --dearmor -o /usr/share/keyrings/winehq.gpg
+echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ jammy main" \
+  > /etc/apt/sources.list.d/winehq.list
