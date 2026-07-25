@@ -1,0 +1,9 @@
+# powerpoint.desktop
+[Desktop Entry]
+Name=ONLYOFFICE Trình chiếu
+Comment=Trình chiếu (giống PowerPoint)
+Exec=/opt/onlyoffice-templates/open-powerpoint.sh
+Icon=onlyoffice-desktopeditors
+Terminal=false
+Type=Application
+Categories=Office;Presentation;
