@@ -78,3 +78,10 @@ cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/usr/share/applications/
 mkdir -p $EXTRACT/squashfs-root/etc/skel/Desktop
 cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
 chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/zalo.desktop
+
+# === Overlay: YouTube Web shortcut ===
+mkdir -p $EXTRACT/squashfs-root/opt/youtube
+cp assets/youtube/youtube.png $EXTRACT/squashfs-root/opt/youtube/
+cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/usr/share/applications/
+cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
+chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/youtube.desktop
