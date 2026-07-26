@@ -119,7 +119,7 @@ cd $WORKDIR/..
 xorriso -as mkisofs \
   -r -V "BACHAOS_${EDITION^^}" \
   -J -joliet-long \
-  -isohybrid-mbr $EXTRACT/isolinux/isohdpfx.bin \
+  -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
   -c isolinux/boot.cat \
   -b isolinux/isolinux.bin \
   -no-emul-boot -boot-load-size 4 -boot-info-table \
