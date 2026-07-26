@@ -101,11 +101,11 @@ echo "=== Debug isolinux txt.cfg ==="
 cat "$EXTRACT/isolinux/txt.cfg" 2>/dev/null | grep -i "mint" || echo "Không thấy chữ Mint"
 
 if [ -f "$EXTRACT/boot/grub/grub.cfg" ]; then
-  sed -i "s/Linux Mint [0-9]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g" "$EXTRACT/boot/grub/grub.cfg"
+  sed -i "s/Linux Mint [0-9.]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g" "$EXTRACT/boot/grub/grub.cfg"
   sed -i "s/Start Linux Mint/Khởi động Bạc Hà OS/g" "$EXTRACT/boot/grub/grub.cfg"
 fi
 if [ -f "$EXTRACT/isolinux/txt.cfg" ]; then
-  sed -i "s/Linux Mint [0-9]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g" "$EXTRACT/isolinux/txt.cfg"
+  sed -i "s/Linux Mint [0-9.]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g" "$EXTRACT/isolinux/txt.cfg"
 fi
 if [ -f "$EXTRACT/isolinux/isolinux.cfg" ]; then
   sed -i "s/Linux Mint/Bạc Hà OS/g" "$EXTRACT/isolinux/isolinux.cfg"
@@ -131,6 +131,7 @@ echo "=== Cấu trúc EFI (nếu có) ==="
 find "$EXTRACT" -iname "*.img" -o -iname "*efi*" 2>/dev/null | head -20
 
 xorriso -as mkisofs \
+  -iso-level 3 \
   -r -V "BACHAOS_${EDITION^^}" \
   -J -joliet-long \
   -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
