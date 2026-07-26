@@ -116,6 +116,14 @@ find . -type f -not -path "./isolinux/*" -not -path "./casper/filesystem.squashf
   -exec md5sum {} \; > md5sum.txt
 cd $WORKDIR/..
 
+# === Debug trước khi gọi xorriso: kiểm tra isohdpfx.bin và thư mục isolinux ===
+echo "=== Kiểm tra isohdpfx.bin ==="
+ls -la /usr/lib/ISOLINUX/isohdpfx.bin 2>/dev/null || \
+  find / -name "isohdpfx.bin" 2>/dev/null
+
+echo "=== Kiểm tra thư mục isolinux trong ISO gốc ==="
+ls -la $EXTRACT/isolinux/ 2>/dev/null || echo "Không có thư mục isolinux trong ISO gốc"
+
 xorriso -as mkisofs \
   -r -V "BACHAOS_${EDITION^^}" \
   -J -joliet-long \
