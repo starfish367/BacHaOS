@@ -9,7 +9,7 @@ Bản Linux Mint (MATE / Cinnamon) remaster dành cho người Việt — cài �
 - 📝 Bộ Office: OnlyOffice (Word/Excel/PowerPoint riêng biệt trên Desktop)
 - 🌐 Trình duyệt: Google Chrome (mặc định), Firefox (giữ song song)
 - 💬 Zalo, YouTube: shortcut web app chạy như ứng dụng riêng
-- 🍷 Wine + Bottles: chạy được ứng dụng/game Windows
+- 🍷 Wine : chạy được ứng dụng/game Windows(Bottle thi cai trong app manger cua BacHaOS)
 - 🔤 Font Unicode đầy đủ (Noto + Microsoft core fonts)
 - 🪶 Tối ưu máy yếu: gỡ/tắt các dịch vụ nền không cần thiết (snap, bluetooth, cups...)
 - 📦 2 phiên bản: **MATE** (nhẹ) và **Cinnamon** (đẹp, đầy đủ hiệu ứng)
@@ -44,4 +44,8 @@ Mọi ý kiến đóng góp, báo lỗi vui lòng tạo Issue hoặc Pull Reques
 
 ## Giấy phép
 
-Dự án dựa trên Linux Mint (GPL). Bản thân các script trong repo này được phát hành dưới giấy phép MIT.
+## Giấy phép
+
+Dự án dựa trên Linux Mint (GPL v3). Các script trong repo này (`build.sh`, `customize.sh`, cấu hình...) được phát hành dưới **GNU General Public License v3.0** — xem chi tiết tại file [LICENSE](LICENSE).
+
+Điều này có nghĩa: bất kỳ ai fork, sửa đổi, hoặc phân phối lại phiên bản dựa trên mã nguồn này đều phải giữ nguyên giấy phép GPL v3 và công khai mã nguồn phần đã sửa.
