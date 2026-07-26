@@ -41,8 +41,14 @@ chroot $EXTRACT/squashfs-root dpkg-query -W -f='${Package}\t${Installed-Size}\t$
 echo "=== Top 40 gói apt nặng nhất ($EDITION, KB) ==="
 head -n 40 output/installed-packages-$EDITION.txt
 
+# === Dọn tiến trình còn giữ /sys, /proc trước khi umount (tránh lỗi "target is busy") ===
+chroot $EXTRACT/squashfs-root pkill -9 dbus-daemon 2>/dev/null || true
+fuser -km $EXTRACT/squashfs-root/sys 2>/dev/null || true
+fuser -km $EXTRACT/squashfs-root/proc 2>/dev/null || true
+sleep 2
+
 for d in sys proc dev/pts dev; do
-  umount $EXTRACT/squashfs-root/$d
+  umount $EXTRACT/squashfs-root/$d 2>/dev/null || umount -l $EXTRACT/squashfs-root/$d
 done
 
 # === Overlay: chèn shortcut TRƯỚC khi đóng gói squashfs ===
