@@ -124,6 +124,12 @@ ls -la /usr/lib/ISOLINUX/isohdpfx.bin 2>/dev/null || \
 echo "=== Kiểm tra thư mục isolinux trong ISO gốc ==="
 ls -la $EXTRACT/isolinux/ 2>/dev/null || echo "Không có thư mục isolinux trong ISO gốc"
 
+# === Cấu trúc boot/grub ===
+echo "=== Cấu trúc boot/grub ==="
+find "$EXTRACT/boot" -type f 2>/dev/null
+echo "=== Cấu trúc EFI (nếu có) ==="
+find "$EXTRACT" -iname "*.img" -o -iname "*efi*" 2>/dev/null | head -20
+
 xorriso -as mkisofs \
   -r -V "BACHAOS_${EDITION^^}" \
   -J -joliet-long \
