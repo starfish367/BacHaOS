@@ -1,5 +1,4 @@
 name: Build Bac Ha OS ISO
-
 on:
   workflow_dispatch:
     inputs:
@@ -7,7 +6,6 @@ on:
         description: 'Phiên bản'
         required: true
         default: '0.1'
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,10 +17,8 @@ jobs:
             iso_url: 'https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso'
           - name: cinnamon
             iso_url: 'https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso'
-
     steps:
       - uses: actions/checkout@v4
-
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -33,13 +29,11 @@ jobs:
           large-packages: true
           docker-images: false
           swap-storage: false
-
       - name: Install build deps
         run: |
           sudo apt-get update
           sudo apt-get install -y squashfs-tools xorriso isolinux \
             syslinux-utils genisoimage rsync p7zip-full
-
       - name: Download Mint ISO (${{ matrix.edition.name }})
         run: |
           wget -q "${{ matrix.edition.iso_url }}" -O mint-base.iso
@@ -49,13 +43,27 @@ jobs:
             echo "LỖI: File ISO tải về quá nhỏ — link sai hoặc mirror lỗi"
             exit 1
           fi
-
       - name: Run remaster script
         run: |
           chmod +x scripts/build.sh
           sudo ./scripts/build.sh mint-base.iso \
             "${{ github.event.inputs.version }}" \
             "${{ matrix.edition.name }}"
+
+      - name: Upload ISO to SourceForge
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SF_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
+
+          ISO_FILE=$(ls output/bac-ha-os-${{ matrix.edition.name }}-*.iso)
+
+          rsync -avP -e "ssh -i ~/.ssh/id_rsa" \
+            "$ISO_FILE" \
+            "${{ secrets.SF_USERNAME }}@frs.sourceforge.net:/home/frs/project/bac-ha-os/"
+
+          echo "Đã upload $(basename $ISO_FILE) lên SourceForge"
 
       - name: Show app & package lists
         run: |
@@ -64,7 +72,6 @@ jobs:
           echo ""
           echo "===== Installed APT packages (top 40 nặng nhất) ====="
           cat output/installed-packages-*.txt
-
       - name: Upload app/package lists
         uses: actions/upload-artifact@v4
         with:
@@ -73,24 +80,26 @@ jobs:
             output/flatpak-apps-*.txt
             output/installed-packages-*.txt
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bac-ha-os-${{ matrix.edition.name }}
-          path: output/bac-ha-os-${{ matrix.edition.name }}-*.iso
-
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download all ISOs
+      - name: Download reports only
         uses: actions/download-artifact@v4
         with:
           path: output
+          pattern: reports-*
           merge-multiple: true
 
-      - name: Upload to GitHub Release
+      - name: Create GitHub Release with SourceForge links
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.event.inputs.version }}
-          files: output/*.iso
+          body: |
+            ## Tải Bạc Hà OS ${{ github.event.inputs.version }}
+
+            - MATE: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-mate-${{ github.event.inputs.version }}-*.iso/download
+            - Cinnamon: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-cinnamon-${{ github.event.inputs.version }}-*.iso/download
+
+            Xem đầy đủ tại: https://sourceforge.net/projects/bac-ha-os/files/
+          files: output/*.txt
