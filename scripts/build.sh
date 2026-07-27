@@ -88,7 +88,10 @@ chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/*.desktop
 mksquashfs $EXTRACT/squashfs-root $EXTRACT/casper/filesystem.squashfs \
   -comp zstd -Xcompression-level 19 -noappend
 
-printf $(du -sx --block-size=1 $EXTRACT/squashfs-root | cut -f1) \
+# === Xoá bản giải nén thô, chỉ giữ lại file .squashfs đã nén ===
+rm -rf $EXTRACT/squashfs-root
+
+printf $(du -sx --block-size=1 $EXTRACT/casper/filesystem.squashfs | cut -f1) \
   > $EXTRACT/casper/filesystem.size
 
 mkdir -p $EXTRACT/preseed
