@@ -89,7 +89,7 @@ done
 
 # --- Branding ---
 echo "bac-ha-os" > /etc/hostname
-sed -i "s/127.0.1.1.*/127.0.1.1\tbac-ha-os/" /etc/hosts
+sed -i "s/127.0.1.1.*/127.0.1.1	bac-ha-os/" /etc/hosts
 sed -i "s/^PRETTY_NAME=.*/PRETTY_NAME=\"Bạc Hà OS ${VERSION} (${EDITION^})\"/" /etc/os-release
 sed -i "s/^NAME=.*/NAME=\"Bạc Hà OS\"/" /etc/os-release
 
@@ -99,6 +99,47 @@ if command -v plymouth-set-default-theme &>/dev/null; then
     /usr/share/plymouth/themes/bacha/bacha.plymouth 100
   plymouth-set-default-theme -R bacha || true
 fi
+
+# --- Set wallpaper mặc định (ảnh 02 - ruộng bậc thang buổi sáng) ---
+# Thực thi an toàn: lỗi sẽ được bỏ qua nếu gsettings không tồn tại trong môi trường chroot
+gsettings set org.mate.background picture-filename \
+  "/usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg" 2>/dev/null || true
+gsettings set org.cinnamon.desktop.background picture-uri \
+  "file:///usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg" 2>/dev/null || true
+
+# --- Đăng ký bộ wallpaper vào trình chọn hình nền (MATE/Cinnamon Backgrounds settings) ---
+mkdir -p /usr/share/mate-background-properties
+cat > /usr/share/mate-background-properties/bacha.xml <<'XMLEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE wallpapers SYSTEM "mate-wp-list.dtd">
+<wallpapers>
+  <wallpaper deleted="false">
+    <name>Bạc Hà - Vịnh Hạ Long</name>
+    <filename>/usr/share/backgrounds/bacha/01-ha-long.jpg</filename>
+    <options>zoom</options>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>Bạc Hà - Ruộng bậc thang</name>
+    <filename>/usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg</filename>
+    <options>zoom</options>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>Bạc Hà - Ruộng bậc thang sương sớm</name>
+    <filename>/usr/share/backgrounds/bacha/03-ruong-bac-thang-suong.jpg</filename>
+    <options>zoom</options>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>Bạc Hà - Vịnh Hạ Long xanh ngọc</name>
+    <filename>/usr/share/backgrounds/bacha/04-ha-long-xanh.jpg</filename>
+    <options>zoom</options>
+  </wallpaper>
+  <wallpaper deleted="false">
+    <name>Bạc Hà - Phố cổ Hà Nội</name>
+    <filename>/usr/share/backgrounds/bacha/05-pho-co-ha-noi.jpg</filename>
+    <options>zoom</options>
+  </wallpaper>
+</wallpapers>
+XMLEOF
 
 # --- Dọn file thừa (LUÔN LÀ BƯỚC CUỐI CÙNG, sau khi đã cài hết mọi thứ) ---
 rm -rf /usr/share/doc/* /usr/share/man/* /var/cache/fontconfig/*
