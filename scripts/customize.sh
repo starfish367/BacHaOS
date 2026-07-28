@@ -93,6 +93,13 @@ sed -i "s/127.0.1.1.*/127.0.1.1\tbac-ha-os/" /etc/hosts
 sed -i "s/^PRETTY_NAME=.*/PRETTY_NAME=\"Bạc Hà OS ${VERSION} (${EDITION^})\"/" /etc/os-release
 sed -i "s/^NAME=.*/NAME=\"Bạc Hà OS\"/" /etc/os-release
 
+# --- Set Plymouth theme mặc định là Bạc Hà OS ---
+if command -v plymouth-set-default-theme &>/dev/null; then
+  update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
+    /usr/share/plymouth/themes/bacha/bacha.plymouth 100
+  plymouth-set-default-theme -R bacha || true
+fi
+
 # --- Dọn file thừa (LUÔN LÀ BƯỚC CUỐI CÙNG, sau khi đã cài hết mọi thứ) ---
 rm -rf /usr/share/doc/* /usr/share/man/* /var/cache/fontconfig/*
 find /usr/share/locale -mindepth 1 -maxdepth 1 \
