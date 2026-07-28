@@ -84,6 +84,12 @@ cp $EXTRACT/squashfs-root/usr/share/applications/google-chrome.desktop \
 
 chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/*.desktop
 
+# === Overlay: Plymouth splash theme Bạc Hà OS ===
+mkdir -p $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha
+cp assets/plymouth/bacha-logo-512.png $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
+cp assets/plymouth/bacha.plymouth $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
+cp assets/plymouth/bacha.script $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
+
 # === Đóng gói squashfs ===
 mksquashfs $EXTRACT/squashfs-root $EXTRACT/casper/filesystem.squashfs \
   -comp zstd -Xcompression-level 19 -noappend
