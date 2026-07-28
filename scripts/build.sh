@@ -90,6 +90,10 @@ cp assets/plymouth/bacha-logo-512.png $EXTRACT/squashfs-root/usr/share/plymouth/
 cp assets/plymouth/bacha.plymouth $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
 cp assets/plymouth/bacha.script $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
 
+# === Overlay: Bộ wallpaper Bạc Hà OS (nhiều ảnh để người dùng chọn) ===
+mkdir -p $EXTRACT/squashfs-root/usr/share/backgrounds/bacha
+cp assets/wallpaper/*.jpg $EXTRACT/squashfs-root/usr/share/backgrounds/bacha/
+
 # === Đóng gói squashfs ===
 mksquashfs $EXTRACT/squashfs-root $EXTRACT/casper/filesystem.squashfs \
   -comp zstd -Xcompression-level 19 -noappend
