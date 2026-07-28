@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Bac Ha OS
+Description=Bac Ha OS boot splash
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/bacha
+ScriptFile=/usr/share/plymouth/themes/bacha/bacha.script
