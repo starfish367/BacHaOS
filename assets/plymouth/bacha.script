@@ -1,0 +1,29 @@
+Window.SetBackgroundTopColor(0.04, 0.24, 0.18);
+Window.SetBackgroundBottomColor(0.02, 0.15, 0.11);
+
+logo.image = Image("logo.png");
+logo.sprite = Sprite(logo.image);
+logo.sprite.SetX(Window.GetWidth()  / 2 - logo.image.GetWidth()  / 2);
+logo.sprite.SetY(Window.GetHeight() / 2 - logo.image.GetHeight() / 2 - 40);
+
+// Vòng xoay loading đơn giản bằng text chấm động
+progress_text = "";
+fun update_text(time) {
+    dots = Math.Int(time * 2) % 4;
+    progress_text = "Đang khởi động Bạc Hà OS";
+    for (i = 0; i < dots; i++) {
+        progress_text += ".";
+    }
+}
+
+text.sprite = Sprite();
+text.sprite.SetX(Window.GetWidth() / 2 - 100);
+text.sprite.SetY(Window.GetHeight() / 2 + 100);
+
+fun refresh_callback() {
+    update_text(Plymouth.GetTime());
+    text.image = Image.Text(progress_text, 1, 1, 1);
+    text.sprite.SetImage(text.image);
+}
+
+Plymouth.SetRefreshFunction(refresh_callback);
