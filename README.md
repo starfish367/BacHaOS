@@ -1,51 +1,63 @@
 # Bạc Hà OS
 
-Bản Linux Mint (MATE / Cinnamon) remaster dành cho người Việt — cài đặt tiếng Việt mặc định, driver đầy đủ, tối ưu cho máy cấu hình yếu, và cài sẵn các ứng dụng phổ biến ở Việt Nam.
+**Bản Linux Mint remaster dành cho người dùng Việt Nam — thân thiện, nhẹ và sẵn sàng sử dụng.**
+
+[![Build ISO](https://github.com/starfish367/BacHaOS/actions/workflows/build.yml/badge.svg)](https://github.com/starfish367/BacHaOS/actions)
+
+Bạc Hà OS tùy biến Linux Mint với giao diện tiếng Việt, bộ gõ tiếng Việt và các ứng dụng thiết yếu. Dự án hướng đến trải nghiệm dễ dùng cho người mới làm quen Linux, đồng thời vẫn phù hợp với máy tính cấu hình vừa và thấp.
 
 ## Tính năng
 
-- 🇻🇳 Ngôn ngữ tiếng Việt + múi giờ Asia/Ho_Chi_Minh mặc định
-- ⌨️ Bộ gõ tiếng Việt: fcitx5-unikey
-- 📝 Bộ Office: OnlyOffice (Word/Excel/PowerPoint riêng biệt trên Desktop)
-- 🌐 Trình duyệt: Google Chrome (mặc định), Firefox (giữ song song)
-- 💬 Zalo, YouTube: shortcut web app chạy như ứng dụng riêng
-- 🍷 Wine : chạy được ứng dụng/game Windows(Bottle thi cai trong app manger cua BacHaOS)
-- 🔤 Font Unicode đầy đủ (Noto + Microsoft core fonts)
-- 🪶 Tối ưu máy yếu: gỡ/tắt các dịch vụ nền không cần thiết (snap, bluetooth, cups...)
-- 📦 2 phiên bản: **MATE** (nhẹ) và **Cinnamon** (đẹp, đầy đủ hiệu ứng)
+- Tiếng Việt và múi giờ `Asia/Ho_Chi_Minh` mặc định
+- Bộ gõ tiếng Việt `fcitx5-unikey`
+- Hai phiên bản giao diện: **MATE** nhẹ và **Cinnamon** hiện đại
+- OnlyOffice, Firefox và Google Chrome
+- Lối tắt Zalo Web và YouTube Web
+- Hỗ trợ Wine/Bottles cho ứng dụng Windows
+- Font Unicode và các tiện ích thiết yếu được chuẩn bị sẵn
+- Quy trình build ISO tự động bằng GitHub Actions
 
-## Cấu trúc repo
-BacHaOS/
-├── .github/workflows/build.yml   # GitHub Actions build ISO tự động
-├── config/
-│   ├── packages.list             # Danh sách gói cài thêm
-│   ├── remove-mate.list          # Gói gỡ bỏ (bản MATE)
-│   ├── remove-cinnamon.list      # Gói gỡ bỏ (bản Cinnamon)
-│   └── preseed.cfg               # Tự động chọn ngôn ngữ/timezone lúc cài
-├── scripts/
-│   ├── build.sh                  # Script remaster chính
-│   └── customize.sh              # Tuỳ biến bên trong ISO (chạy trong chroot)
-└── assets/
-├── zalo/                     # Icon + shortcut Zalo Web
-├── youtube/                  # Icon + shortcut YouTube Web
-└── onlyoffice-templates/     # File mẫu + shortcut Word/Excel/PowerPoint
+## Bắt đầu nhanh
 
+### Build bằng GitHub Actions
 
-## Cách build ISO
+1. Mở tab **Actions**.
+2. Chọn workflow build ISO.
+3. Chọn **Run workflow**.
+4. Chờ workflow hoàn tất và tải ISO từ artifact hoặc Releases.
 
-1. Vào tab **Actions** → chọn workflow **"Build Bac Ha OS ISO"**
-2. Bấm **"Run workflow"**, nhập số phiên bản (ví dụ `0.1`)
-3. Đợi build xong (khoảng 20-40 phút cho cả 2 edition)
-4. Vào tab **Releases** để tải file `.iso`
+### Build thủ công
+
+Build trên máy Linux có quyền `sudo`:
+
+```bash
+git clone https://github.com/starfish367/BacHaOS.git
+cd BacHaOS
+chmod +x scripts/*.sh
+sudo ./scripts/build.sh
+```
+
+> Build ISO có thể cần nhiều dung lượng đĩa và thời gian. Hãy đọc script trước khi chạy trên máy thật.
+
+## Cấu trúc dự án
+
+```text
+scripts/                 # Script build và tùy biến ISO
+config/                  # Gói cài đặt, gói loại bỏ và preseed
+assets/                  # Icon, shortcut và template
+.github/workflows/       # Tự động build ISO
+```
+
+Danh sách gói của bản MATE nằm tại [`docs/app-list-mate.md`](docs/app-list-mate.md).
 
 ## Đóng góp
 
-Mọi ý kiến đóng góp, báo lỗi vui lòng tạo Issue hoặc Pull Request.
+Issue và Pull Request luôn được chào đón. Nếu phát hiện lỗi hoặc có ý tưởng cải tiến, hãy mở một Issue và mô tả cách tái hiện rõ ràng.
 
 ## Giấy phép
 
-## Giấy phép
+Phát hành theo [GNU GPL-3.0](LICENSE). Bạc Hà OS là một dự án cộng đồng dựa trên Linux Mint.
 
-Dự án dựa trên Linux Mint (GPL v3). Các script trong repo này (`build.sh`, `customize.sh`, cấu hình...) được phát hành dưới **GNU General Public License v3.0** — xem chi tiết tại file [LICENSE](LICENSE).
+## Từ khóa
 
-Điều này có nghĩa: bất kỳ ai fork, sửa đổi, hoặc phân phối lại phiên bản dựa trên mã nguồn này đều phải giữ nguyên giấy phép GPL v3 và công khai mã nguồn phần đã sửa.
+`Linux Mint` · `Bac Ha OS` · `Bạc Hà OS` · `Vietnamese Linux` · `Linux remaster` · `MATE` · `Cinnamon` · `fcitx5-unikey` · `Vietnam`
