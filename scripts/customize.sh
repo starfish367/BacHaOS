@@ -6,7 +6,7 @@ EDITION=${2:-mate}
 
 # --- Locale + timezone tiếng Việt ---
 locale-gen vi_VN.UTF-8
-update-locale LANG=vi_VN.UTF-8
+update-locale LANG=vi_VN.UTF-8 LC_ALL=vi_VN.UTF-8
 ln -sf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
 echo "Asia/Ho_Chi_Minh" > /etc/timezone
 
@@ -40,7 +40,9 @@ echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-
 apt-get update
 
 # --- Cài toàn bộ gói (1 lần duy nhất) ---
-xargs -a /tmp/packages.list apt-get install -y
+if [ -f /tmp/packages.list ]; then
+    xargs -a /tmp/packages.list apt-get install -y
+fi
 apt-get install -y google-chrome-stable
 apt-get install -y fcitx5 fcitx5-unikey fcitx5-config-qt
 im-config -n fcitx5
@@ -52,7 +54,8 @@ apt-get install -y gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
 
 # --- Cài sẵn Flatpak + Flathub remote (để user tự cài Bottles/app khác sau nếu cần) ---
 apt-get install -y flatpak
-flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+flatpak remote-add --if-not-exists flathub \
+  https://flathub.org/repo/flathub.flatpakrepo || true
 # Không cài Bottles sẵn — để ISO nhẹ, user tự cài qua Software Manager khi cần
 
 # --- Set Chrome làm trình duyệt mặc định ---
@@ -63,7 +66,9 @@ update-alternatives --set x-www-browser /usr/bin/google-chrome-stable || true
 fc-cache -f -v
 
 # --- Gỡ gói theo remove list ---
-xargs -a /tmp/remove.list apt-get purge -y || true
+if [ -f /tmp/remove.list ]; then
+    xargs -a /tmp/remove.list apt-get purge -y || true
+fi
 apt-get autoremove -y
 
 # --- Tắt/mask service không cần chạy nền ---
@@ -93,19 +98,39 @@ sed -i "s/127.0.1.1.*/127.0.1.1	bac-ha-os/" /etc/hosts
 sed -i "s/^PRETTY_NAME=.*/PRETTY_NAME=\"Bạc Hà OS ${VERSION} (${EDITION^})\"/" /etc/os-release
 sed -i "s/^NAME=.*/NAME=\"Bạc Hà OS\"/" /etc/os-release
 
+# --- Bổ sung branding Linux Mint ---
+if [ -f /etc/linuxmint/info ]; then
+  sed -i "s/^EDITION=.*/EDITION=\"Bạc Hà OS ${EDITION^}\"/" /etc/linuxmint/info
+  sed -i "s/^DESCRIPTION=.*/DESCRIPTION=\"Bạc Hà OS ${VERSION}\"/" /etc/linuxmint/info
+  sed -i "s/^GRUB_TITLE=.*/GRUB_TITLE=\"Bạc Hà OS\"/" /etc/linuxmint/info
+fi
+
 # --- Set Plymouth theme mặc định là Bạc Hà OS ---
 if command -v plymouth-set-default-theme &>/dev/null; then
   update-alternatives --install /usr/share/plymouth/themes/default.plymouth default.plymouth \
     /usr/share/plymouth/themes/bacha/bacha.plymouth 100
-  plymouth-set-default-theme -R bacha || true
+
+  plymouth-set-default-theme bacha || true
+  update-initramfs -u || true
 fi
 
-# --- Set wallpaper mặc định (ảnh 02 - ruộng bậc thang buổi sáng) ---
-# Thực thi an toàn: lỗi sẽ được bỏ qua nếu gsettings không tồn tại trong môi trường chroot
-gsettings set org.mate.background picture-filename \
-  "/usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg" 2>/dev/null || true
-gsettings set org.cinnamon.desktop.background picture-uri \
-  "file:///usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg" 2>/dev/null || true
+# --- Thiết lập wallpaper mặc định bằng dconf (hoạt động trong chroot) ---
+mkdir -p /etc/dconf/profile
+cat > /etc/dconf/profile/user <<'EOF'
+user-db:user
+system-db:bacha
+EOF
+
+mkdir -p /etc/dconf/db/bacha.d
+cat > /etc/dconf/db/bacha.d/01-wallpaper <<'EOF'
+[org/mate/desktop/background]
+picture-filename='/usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg'
+
+[org/cinnamon/desktop/background]
+picture-uri='file:///usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg'
+EOF
+
+dconf update
 
 # --- Đăng ký bộ wallpaper vào trình chọn hình nền (MATE/Cinnamon Backgrounds settings) ---
 mkdir -p /usr/share/mate-background-properties
