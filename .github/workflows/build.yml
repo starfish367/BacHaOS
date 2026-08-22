@@ -122,6 +122,10 @@ jobs:
           pattern: reports-*
           merge-multiple: true
 
+      - name: Remove empty report files
+        run: |
+          find output -type f -empty -print -delete
+
       - name: Create GitHub Release with SourceForge links
         uses: softprops/action-gh-release@v2
         with:
