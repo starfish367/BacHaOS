@@ -101,14 +101,14 @@ jobs:
           done
 
       - name: Upload app/package lists
-  uses: actions/upload-artifact@v4
-  with:
-    name: reports-${{ matrix.edition.name }}
-    path: |
-      output/flatpak-apps-*.txt
-      output/installed-packages-*.txt
-   # Thêm bước kiểm tra file không rỗng
-   if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reports-${{ matrix.edition.name }}
+          path: |
+            output/flatpak-apps-*.txt
+            output/installed-packages-*.txt
+        # Thêm bước kiểm tra file không rỗng
+        if: always()
 
 
   release:
@@ -123,15 +123,15 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub Release with SourceForge links
-  uses: softprops/action-gh-release@v2
-  with:
-    tag_name: v${{ github.event.inputs.version }}
-    body: |
-      ## Tải Bạc Hà OS ${{ github.event.inputs.version }}
-      - MATE: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-mate-${{ github.event.inputs.version }}-*.iso/download
-      - Cinnamon: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-cinnamon-${{ github.event.inputs.version }}-*.iso/download
-    files: |
-      output/installed-packages-mate.txt
-      output/installed-packages-cinnamon.txt
-      output/flatpak-apps-mate.txt
-      output/flatpak-apps-cinnamon.txt
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.event.inputs.version }}
+          body: |
+            ## Tải Bạc Hà OS ${{ github.event.inputs.version }}
+            - MATE: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-mate-${{ github.event.inputs.version }}-*.iso/download
+            - Cinnamon: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-cinnamon-${{ github.event.inputs.version }}-*.iso/download
+          files: |
+            output/installed-packages-mate.txt
+            output/installed-packages-cinnamon.txt
+            output/flatpak-apps-mate.txt
+            output/flatpak-apps-cinnamon.txt
