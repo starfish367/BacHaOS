@@ -61,3 +61,7 @@ Phát hành theo [GNU GPL-3.0](LICENSE). Bạc Hà OS là một dự án cộng 
 ## Từ khóa
 
 `Linux Mint` · `Bac Ha OS` · `Bạc Hà OS` · `Vietnamese Linux` · `Linux remaster` · `MATE` · `Cinnamon` · `fcitx5-unikey` · `Vietnam`
+
+##Vấn đề
+
+Vì lý do đời sống cá nhân,nên tôi(starfish367) không thường xuyên update repo này
