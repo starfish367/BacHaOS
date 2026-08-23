@@ -38,13 +38,18 @@ for command_name in "${require_commands[@]}"; do
   }
 done
 
-cleanup() {
-  local exit_status=$?
+unmount_chroot_mounts() {
+  chroot "$CHROOT" pkill -9 dbus-daemon 2>/dev/null || true
   for mount_path in "${CHROOT}/sys" "${CHROOT}/proc" "${CHROOT}/dev/pts" "${CHROOT}/dev"; do
     if mountpoint -q "$mount_path"; then
       umount -l "$mount_path" || true
     fi
   done
+}
+
+cleanup() {
+  local exit_status=$?
+  unmount_chroot_mounts
   if mountpoint -q "$MOUNT"; then
     umount -l "$MOUNT" || true
   fi
@@ -81,6 +86,9 @@ fi
 # shellcheck disable=SC2016 # dpkg-query parses its own placeholder format.
 chroot "$CHROOT" dpkg-query -W -f='${Package}\t${Installed-Size}\t${Version}\n' \
   | sort -k2 -n -r > "${OUTPUT_DIR}/installed-packages-${EDITION}.txt"
+
+echo "==> Dọn các bind mount chroot trước khi đóng gói"
+unmount_chroot_mounts
 
 echo "==> Thêm shortcut và asset Bạc Hà OS"
 install -d "${CHROOT}/etc/skel/Desktop" "${CHROOT}/usr/share/applications"
