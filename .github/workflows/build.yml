@@ -1,141 +1,171 @@
 name: Build Bac Ha OS ISO
+
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Phiên bản'
+        description: "Phiên bản phát hành (ví dụ: 0.1.3)"
         required: true
-        default: '0.1.1'
+        default: "0.1.3"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bacha-release-${{ github.event.inputs.version }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 110
     strategy:
       fail-fast: false
       matrix:
         edition:
           - name: mate
-            iso_url: 'https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso'
+            iso_url: https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso
           - name: cinnamon
-            iso_url: 'https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso'
+            iso_url: https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso
     steps:
       - uses: actions/checkout@v4
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: true
-          android: true
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: false
-          swap-storage: false
-      - name: Install build deps
+
+      - name: Reclaim build disk space
         run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/share/boost
+          sudo docker image prune --all --force || true
+          df -h
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y squashfs-tools xorriso isolinux \
-            syslinux-utils genisoimage rsync p7zip-full
-      - name: Download Mint ISO (${{ matrix.edition.name }})
+          sudo apt-get install -y --no-install-recommends \
+            squashfs-tools xorriso isolinux syslinux-utils genisoimage rsync p7zip-full curl
+
+      - name: Download and verify Linux Mint base ISO (${{ matrix.edition.name }})
         run: |
-          wget -q "${{ matrix.edition.iso_url }}" -O mint-base.iso
-          SIZE=$(stat -c%s mint-base.iso 2>/dev/null || echo 0)
-          echo "Kích thước file tải về: $SIZE bytes"
-          if [ "$SIZE" -lt 1000000000 ]; then
-            echo "LỖI: File ISO tải về quá nhỏ — link sai hoặc mirror lỗi"
-            exit 1
-          fi
+          set -euo pipefail
+          ISO_URL='${{ matrix.edition.iso_url }}'
+          ISO_NAME="$(basename "$ISO_URL")"
+          ISO_DIR="$(dirname "$ISO_URL")"
+          curl --fail --location --retry 4 --retry-all-errors --connect-timeout 30 \
+            --output mint-base.iso "$ISO_URL"
+          curl --fail --location --retry 4 --retry-all-errors --connect-timeout 30 \
+            --output sha256sum.txt "${ISO_DIR}/sha256sum.txt"
+          grep -F "  ${ISO_NAME}" sha256sum.txt | sha256sum --check --status --strict
+          test "$(stat -c%s mint-base.iso)" -gt 1000000000
+
+      - name: Lint remaster scripts
+        run: |
+          set -euo pipefail
+          bash -n scripts/build.sh scripts/customize.sh
+          sudo apt-get install -y --no-install-recommends shellcheck
+          shellcheck -x scripts/build.sh scripts/customize.sh assets/bacha-os-hello/bacha-os-hello
+
       - name: Run remaster script
         run: |
+          set -euo pipefail
           chmod +x scripts/build.sh
           sudo ./scripts/build.sh mint-base.iso \
-            "${{ github.event.inputs.version }}" \
-            "${{ matrix.edition.name }}"
+            '${{ github.event.inputs.version }}' \
+            '${{ matrix.edition.name }}'
 
-      - name: Upload ISO to SourceForge
+      - name: Validate build outputs
         run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SF_SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          set -euo pipefail
+          source "output/release-${{ matrix.edition.name }}.env"
+          test -s "output/${ISO_FILENAME}"
+          test -s "output/${ISO_FILENAME}.sha256"
+          test -s "output/installed-packages-${{ matrix.edition.name }}.txt"
+          (cd output && sha256sum --check "${ISO_FILENAME}.sha256")
+          grep -F "${ISO_SHA256}" "output/${ISO_FILENAME}.sha256"
+
+      - name: Upload ISO and checksum to SourceForge
+        env:
+          SF_SSH_PRIVATE_KEY: ${{ secrets.SF_SSH_PRIVATE_KEY }}
+          SF_USERNAME: ${{ secrets.SF_USERNAME }}
+        run: |
+          set -euo pipefail
+          test -n "$SF_SSH_PRIVATE_KEY"
+          test -n "$SF_USERNAME"
+          source "output/release-${{ matrix.edition.name }}.env"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$SF_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
+          rsync --archive --verbose --partial --append-verify \
+            -e 'ssh -i ~/.ssh/id_rsa' \
+            "output/${ISO_FILENAME}" "output/${ISO_FILENAME}.sha256" \
+            "${SF_USERNAME}@frs.sourceforge.net:/home/frs/project/bac-ha-os/"
 
-          ISO_FILE=$(ls output/bac-ha-os-${{ matrix.edition.name }}-*.iso)
-
-          rsync -avP -e "ssh -i ~/.ssh/id_rsa" \
-            "$ISO_FILE" \
-            "${{ secrets.SF_USERNAME }}@frs.sourceforge.net:/home/frs/project/bac-ha-os/"
-
-          echo "Đã upload $(basename $ISO_FILE) lên SourceForge"
-
-      - name: Show app & package lists
-        run: |
-          echo "===== Flatpak apps ====="
-          cat output/flatpak-apps-*.txt
-          echo ""
-          echo "===== Installed APT packages (top 40 nặng nhất) ====="
-          cat output/installed-packages-*.txt
-
-      - name: Save full package list to repo docs
-        run: |
-          mkdir -p docs
-          {
-            echo "# Danh sách gói APT - Bạc Hà OS (${{ matrix.edition.name }})"
-            echo ""
-            echo "Cập nhật tự động: $(date +%Y-%m-%d)"
-            echo ""
-            echo "| Package | Size (KB) | Version |"
-            echo "|---|---|---|"
-            awk -F'\t' '{print "| "$1" | "$2" | "$3" |"}' output/installed-packages-${{ matrix.edition.name }}.txt
-          } > docs/app-list-${{ matrix.edition.name }}.md
-
-      - name: Commit package list to repo
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/app-list-${{ matrix.edition.name }}.md
-          git diff --staged --quiet || git commit -m "Cập nhật danh sách gói APT (${{ matrix.edition.name }})"
-
-          # Thử push, nếu bị rejected do có commit mới từ job song song, pull rebase rồi thử lại
-          for i in 1 2 3 4 5; do
-            git pull --rebase origin main && git push && break
-            echo "Push thất bại, thử lại lần $i..."
-            sleep $((RANDOM % 10 + 5))
-          done
-
-      - name: Upload app/package lists
+      - name: Upload release reports
         uses: actions/upload-artifact@v4
         with:
           name: reports-${{ matrix.edition.name }}
+          if-no-files-found: error
           path: |
-            output/flatpak-apps-*.txt
-            output/installed-packages-*.txt
-        # Thêm bước kiểm tra file không rỗng
-        if: always()
-
+            output/installed-packages-${{ matrix.edition.name }}.txt
+            output/flatpak-apps-${{ matrix.edition.name }}.txt
+            output/release-${{ matrix.edition.name }}.env
+            output/bac-ha-os-${{ matrix.edition.name }}-*.iso.sha256
 
   release:
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
-      - name: Download reports only
+      - name: Download build reports
         uses: actions/download-artifact@v4
         with:
           path: output
           pattern: reports-*
           merge-multiple: true
 
-      - name: Remove empty report files
+      - name: Build release notes
         run: |
-          find output -type f -empty -print -delete
+          set -euo pipefail
+          source output/release-mate.env
+          MATE_FILENAME="$ISO_FILENAME"
+          MATE_SHA256="$ISO_SHA256"
+          MATE_URL="$SOURCEFORGE_ISO_URL"
+          MATE_SUM_URL="$SOURCEFORGE_SHA256_URL"
+          source output/release-cinnamon.env
+          CINNAMON_FILENAME="$ISO_FILENAME"
+          CINNAMON_SHA256="$ISO_SHA256"
+          CINNAMON_URL="$SOURCEFORGE_ISO_URL"
+          CINNAMON_SUM_URL="$SOURCEFORGE_SHA256_URL"
+          for required_file in \
+            output/installed-packages-mate.txt \
+            output/installed-packages-cinnamon.txt \
+            "output/${MATE_FILENAME}.sha256" \
+            "output/${CINNAMON_FILENAME}.sha256"; do
+            test -s "$required_file"
+          done
+          cat > release-notes.md <<EOF
+          ## Bạc Hà OS ${{ github.event.inputs.version }}
+
+          Bản phát hành này bổ sung **BacHa OS Hello**: tiện ích một chạm giúp gắn các phân vùng NTFS chưa được mount sau khi đăng nhập. Tiện ích dùng UDisks với quyền phiên người dùng, bỏ qua phân vùng đã mount và không ép ghi khi Windows đang ở trạng thái không an toàn.
+
+          ### Tải ISO từ SourceForge
+
+          | Edition | ISO | SHA-256 |
+          | --- | --- | --- |
+          | MATE | [${MATE_FILENAME}](${MATE_URL}) | ${MATE_SHA256} · [tệp checksum](${MATE_SUM_URL}) |
+          | Cinnamon | [${CINNAMON_FILENAME}](${CINNAMON_URL}) | ${CINNAMON_SHA256} · [tệp checksum](${CINNAMON_SUM_URL}) |
+
+          Hãy đối chiếu SHA-256 trước khi tạo USB boot. Báo cáo danh sách gói và checksum cũng được đính kèm tại GitHub Release này.
+          EOF
 
       - name: Create GitHub Release with SourceForge links
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ github.event.inputs.version }}
-          body: |
-            ## Tải Bạc Hà OS ${{ github.event.inputs.version }}
-            - MATE: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-mate-${{ github.event.inputs.version }}-*.iso/download
-            - Cinnamon: https://sourceforge.net/projects/bac-ha-os/files/bac-ha-os-cinnamon-${{ github.event.inputs.version }}-*.iso/download
+          name: Bạc Hà OS v${{ github.event.inputs.version }}
+          body_path: release-notes.md
+          generate_release_notes: true
           files: |
             output/installed-packages-mate.txt
             output/installed-packages-cinnamon.txt
-            output/flatpak-apps-mate.txt
-            output/flatpak-apps-cinnamon.txt
+            output/*.iso.sha256

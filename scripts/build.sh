@@ -1,158 +1,185 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+# BacHaOS remaster pipeline: predictable paths, cleanup on every exit, release manifest and checksum.
+set -Eeuo pipefail
 
-ISO=$1
+if [[ $# -lt 1 ]]; then
+  echo "Cách dùng: $0 <mint-base.iso> [version] [mate|cinnamon]" >&2
+  exit 64
+fi
+
+ROOT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)
+ISO=$(realpath -- "$1")
 VERSION=${2:-0.1}
 EDITION=${3:-mate}
-WORKDIR=$(pwd)/remaster-$EDITION
-MOUNT=$WORKDIR/mnt
-EXTRACT=$WORKDIR/extract
-mkdir -p $MOUNT $EXTRACT output
+WORKDIR="${ROOT_DIR}/remaster-${EDITION}"
+MOUNT="${WORKDIR}/mnt"
+EXTRACT="${WORKDIR}/extract"
+CHROOT="${EXTRACT}/squashfs-root"
+OUTPUT_DIR="${ROOT_DIR}/output"
+BUILD_DATE=$(date -u +%Y%m%d)
+ISO_FILENAME="bac-ha-os-${EDITION}-${VERSION}-${BUILD_DATE}.iso"
+ISO_OUTPUT="${OUTPUT_DIR}/${ISO_FILENAME}"
 
-mount -o loop "$ISO" $MOUNT
-rsync -a $MOUNT/ $EXTRACT/ --exclude=/casper/filesystem.squashfs
-unsquashfs -d $EXTRACT/squashfs-root $MOUNT/casper/filesystem.squashfs
-umount $MOUNT
+case "$EDITION" in
+  mate|cinnamon) ;;
+  *) echo "Edition không hợp lệ: ${EDITION}" >&2; exit 64 ;;
+esac
 
-for d in dev dev/pts proc sys; do
-  mount --bind /$d $EXTRACT/squashfs-root/$d
+if [[ ! -f "$ISO" ]]; then
+  echo "Không tìm thấy ISO gốc: $ISO" >&2
+  exit 66
+fi
+
+require_commands=(mount umount rsync unsquashfs chroot mksquashfs xorriso md5sum sha256sum)
+for command_name in "${require_commands[@]}"; do
+  command -v "$command_name" >/dev/null 2>&1 || {
+    echo "Thiếu lệnh cần thiết: ${command_name}" >&2
+    exit 69
+  }
 done
-cp /etc/resolv.conf $EXTRACT/squashfs-root/etc/resolv.conf
 
-cp scripts/customize.sh $EXTRACT/squashfs-root/tmp/
-cp config/packages.list $EXTRACT/squashfs-root/tmp/
-cp config/remove-$EDITION.list $EXTRACT/squashfs-root/tmp/remove.list
-chroot $EXTRACT/squashfs-root /bin/bash /tmp/customize.sh "$VERSION" "$EDITION"
-rm -f $EXTRACT/squashfs-root/tmp/customize.sh
+cleanup() {
+  local exit_status=$?
+  for mount_path in "${CHROOT}/sys" "${CHROOT}/proc" "${CHROOT}/dev/pts" "${CHROOT}/dev"; do
+    if mountpoint -q "$mount_path"; then
+      umount -l "$mount_path" || true
+    fi
+  done
+  if mountpoint -q "$MOUNT"; then
+    umount -l "$MOUNT" || true
+  fi
+  exit "$exit_status"
+}
+trap cleanup EXIT
 
-# === Liệt kê Flatpak (còn trong chroot) ===
-if chroot $EXTRACT/squashfs-root which flatpak &>/dev/null; then
-  chroot $EXTRACT/squashfs-root bash -c "dbus-launch flatpak list --app --columns=application,name,version,size" \
-    > output/flatpak-apps-$EDITION.txt 2>/dev/null || echo "Flatpak list lỗi" > output/flatpak-apps-$EDITION.txt
+mkdir -p "$MOUNT" "$EXTRACT" "$OUTPUT_DIR"
+
+echo "==> Mount ISO gốc: $(basename "$ISO")"
+mount -o loop "$ISO" "$MOUNT"
+rsync -a "${MOUNT}/" "${EXTRACT}/" --exclude=/casper/filesystem.squashfs
+unsquashfs -d "$CHROOT" "${MOUNT}/casper/filesystem.squashfs"
+umount "$MOUNT"
+
+for directory in dev dev/pts proc sys; do
+  mount --bind "/${directory}" "${CHROOT}/${directory}"
+done
+cp /etc/resolv.conf "${CHROOT}/etc/resolv.conf"
+
+install -m 0755 "${ROOT_DIR}/scripts/customize.sh" "${CHROOT}/tmp/customize.sh"
+install -m 0644 "${ROOT_DIR}/config/packages.list" "${CHROOT}/tmp/packages.list"
+install -m 0644 "${ROOT_DIR}/config/remove-${EDITION}.list" "${CHROOT}/tmp/remove.list"
+chroot "$CHROOT" /bin/bash /tmp/customize.sh "$VERSION" "$EDITION"
+rm -f "${CHROOT}/tmp/customize.sh" "${CHROOT}/tmp/packages.list" "${CHROOT}/tmp/remove.list"
+
+echo "==> Thu thập báo cáo gói"
+if chroot "$CHROOT" /usr/bin/env bash -c 'command -v flatpak' >/dev/null 2>&1; then
+  chroot "$CHROOT" bash -c 'dbus-launch flatpak list --app --columns=application,name,version,size 2>/dev/null || true' \
+    > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt"
 else
-  echo "Không có Flatpak trong ISO gốc ($EDITION)" > output/flatpak-apps-$EDITION.txt
+  printf '%s\n' "Flatpak không có trong ISO gốc (${EDITION})" > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt"
 fi
-echo "=== Flatpak apps ($EDITION) ==="
-cat output/flatpak-apps-$EDITION.txt
+# shellcheck disable=SC2016 # dpkg-query parses its own placeholder format.
+chroot "$CHROOT" dpkg-query -W -f='${Package}\t${Installed-Size}\t${Version}\n' \
+  | sort -k2 -n -r > "${OUTPUT_DIR}/installed-packages-${EDITION}.txt"
 
-# === Liệt kê toàn bộ gói apt đã cài (còn trong chroot) ===
-chroot $EXTRACT/squashfs-root dpkg-query -W -f='${Package}\t${Installed-Size}\t${Version}\n' \
-  | sort -k2 -n -r > output/installed-packages-$EDITION.txt
-echo "=== Top 40 gói apt nặng nhất ($EDITION, KB) ==="
-head -n 40 output/installed-packages-$EDITION.txt
+echo "==> Thêm shortcut và asset Bạc Hà OS"
+install -d "${CHROOT}/etc/skel/Desktop" "${CHROOT}/usr/share/applications"
 
-# === Dọn tiến trình còn giữ /sys, /proc trước khi umount (tránh lỗi "target is busy") ===
-chroot $EXTRACT/squashfs-root pkill -9 dbus-daemon 2>/dev/null || true
-fuser -km $EXTRACT/squashfs-root/sys 2>/dev/null || true
-fuser -km $EXTRACT/squashfs-root/proc 2>/dev/null || true
-sleep 2
+install -d "${CHROOT}/opt/zalo"
+install -m 0644 "${ROOT_DIR}/assets/zalo/logo-zalo-vector-03.png" "${CHROOT}/opt/zalo/"
+install -m 0644 "${ROOT_DIR}/assets/zalo/zalo.desktop" "${CHROOT}/usr/share/applications/"
+install -m 0644 "${ROOT_DIR}/assets/zalo/zalo.desktop" "${CHROOT}/etc/skel/Desktop/"
 
-for d in sys proc dev/pts dev; do
-  umount $EXTRACT/squashfs-root/$d 2>/dev/null || umount -l $EXTRACT/squashfs-root/$d
-done
+install -d "${CHROOT}/opt/youtube"
+install -m 0644 "${ROOT_DIR}/assets/youtube/youtube.png" "${CHROOT}/opt/youtube/"
+install -m 0644 "${ROOT_DIR}/assets/youtube/youtube.desktop" "${CHROOT}/usr/share/applications/"
+install -m 0644 "${ROOT_DIR}/assets/youtube/youtube.desktop" "${CHROOT}/etc/skel/Desktop/"
 
-# === Overlay: chèn shortcut TRƯỚC khi đóng gói squashfs ===
-mkdir -p $EXTRACT/squashfs-root/etc/skel/Desktop
+install -d "${CHROOT}/opt/onlyoffice-templates"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/blank.docx" "${CHROOT}/opt/onlyoffice-templates/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/blank.xlsx" "${CHROOT}/opt/onlyoffice-templates/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/blank.pptx" "${CHROOT}/opt/onlyoffice-templates/"
+install -m 0755 "${ROOT_DIR}/assets/onlyoffice-templates/open-word.sh" "${CHROOT}/opt/onlyoffice-templates/"
+install -m 0755 "${ROOT_DIR}/assets/onlyoffice-templates/open-excel.sh" "${CHROOT}/opt/onlyoffice-templates/"
+install -m 0755 "${ROOT_DIR}/assets/onlyoffice-templates/open-powerpoint.sh" "${CHROOT}/opt/onlyoffice-templates/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/word.desktop" "${CHROOT}/usr/share/applications/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/excel.desktop" "${CHROOT}/usr/share/applications/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/powerpoint.desktop" "${CHROOT}/usr/share/applications/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/word.desktop" "${CHROOT}/etc/skel/Desktop/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/excel.desktop" "${CHROOT}/etc/skel/Desktop/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/powerpoint.desktop" "${CHROOT}/etc/skel/Desktop/"
 
-# --- Zalo ---
-mkdir -p $EXTRACT/squashfs-root/opt/zalo
-cp assets/zalo/logo-zalo-vector-03.png $EXTRACT/squashfs-root/opt/zalo/
-cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/usr/share/applications/
-cp assets/zalo/zalo.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
-
-# --- YouTube ---
-mkdir -p $EXTRACT/squashfs-root/opt/youtube
-cp assets/youtube/youtube.png $EXTRACT/squashfs-root/opt/youtube/
-cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/usr/share/applications/
-cp assets/youtube/youtube.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
-
-# --- OnlyOffice ---
-mkdir -p $EXTRACT/squashfs-root/opt/onlyoffice-templates
-cp assets/onlyoffice-templates/blank.docx $EXTRACT/squashfs-root/opt/onlyoffice-templates/
-cp assets/onlyoffice-templates/blank.xlsx $EXTRACT/squashfs-root/opt/onlyoffice-templates/
-cp assets/onlyoffice-templates/blank.pptx $EXTRACT/squashfs-root/opt/onlyoffice-templates/
-cp assets/onlyoffice-templates/open-word.sh $EXTRACT/squashfs-root/opt/onlyoffice-templates/
-cp assets/onlyoffice-templates/open-excel.sh $EXTRACT/squashfs-root/opt/onlyoffice-templates/
-cp assets/onlyoffice-templates/open-powerpoint.sh $EXTRACT/squashfs-root/opt/onlyoffice-templates/
-chmod +x $EXTRACT/squashfs-root/opt/onlyoffice-templates/open-*.sh
-cp assets/onlyoffice-templates/*.desktop $EXTRACT/squashfs-root/usr/share/applications/
-cp assets/onlyoffice-templates/*.desktop $EXTRACT/squashfs-root/etc/skel/Desktop/
-
-# --- Chrome ---
-cp $EXTRACT/squashfs-root/usr/share/applications/google-chrome.desktop \
-  $EXTRACT/squashfs-root/etc/skel/Desktop/ 2>/dev/null || true
-
-chmod +x $EXTRACT/squashfs-root/etc/skel/Desktop/*.desktop
-
-# === Overlay: Plymouth splash theme Bạc Hà OS ===
-mkdir -p $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha
-cp assets/plymouth/bacha-logo-512.png $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
-cp assets/plymouth/bacha.plymouth $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
-cp assets/plymouth/bacha.script $EXTRACT/squashfs-root/usr/share/plymouth/themes/bacha/
-
-# === Overlay: Bộ wallpaper Bạc Hà OS (nhiều ảnh để người dùng chọn) ===
-mkdir -p $EXTRACT/squashfs-root/usr/share/backgrounds/bacha
-cp assets/wallpaper/*.jpg $EXTRACT/squashfs-root/usr/share/backgrounds/bacha/
-
-# === Đóng gói squashfs ===
-mksquashfs $EXTRACT/squashfs-root $EXTRACT/casper/filesystem.squashfs \
-  -comp zstd -Xcompression-level 19 -noappend
-
-# === Xoá bản giải nén thô, chỉ giữ lại file .squashfs đã nén ===
-rm -rf $EXTRACT/squashfs-root
-
-printf $(du -sx --block-size=1 $EXTRACT/casper/filesystem.squashfs | cut -f1) \
-  > $EXTRACT/casper/filesystem.size
-
-mkdir -p $EXTRACT/preseed
-cp config/preseed.cfg $EXTRACT/preseed/bacha.seed
-
-# === Đổi tên GRUB/isolinux ===
-echo "=== Debug grub.cfg ==="
-cat "$EXTRACT/boot/grub/grub.cfg" 2>/dev/null | grep -i "mint" || echo "Không thấy chữ Mint"
-echo "=== Debug isolinux txt.cfg ==="
-cat "$EXTRACT/isolinux/txt.cfg" 2>/dev/null | grep -i "mint" || echo "Không thấy chữ Mint"
-
-if [ -f "$EXTRACT/boot/grub/grub.cfg" ]; then
-  sed -i "s/Linux Mint [0-9.]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g" "$EXTRACT/boot/grub/grub.cfg"
-  sed -i "s/Start Linux Mint/Khởi động Bạc Hà OS/g" "$EXTRACT/boot/grub/grub.cfg"
-fi
-if [ -f "$EXTRACT/isolinux/txt.cfg" ]; then
-  sed -i "s/Linux Mint [0-9.]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g" "$EXTRACT/isolinux/txt.cfg"
-fi
-if [ -f "$EXTRACT/isolinux/isolinux.cfg" ]; then
-  sed -i "s/Linux Mint/Bạc Hà OS/g" "$EXTRACT/isolinux/isolinux.cfg"
+if [[ -f "${CHROOT}/usr/share/applications/google-chrome.desktop" ]]; then
+  install -m 0644 "${CHROOT}/usr/share/applications/google-chrome.desktop" "${CHROOT}/etc/skel/Desktop/"
 fi
 
-cd $EXTRACT
-find . -type f -not -path "./isolinux/*" -not -path "./casper/filesystem.squashfs" \
-  -exec md5sum {} \; > md5sum.txt
-cd $WORKDIR/..
+install -d "${CHROOT}/opt/bacha-os-hello" "${CHROOT}/etc/xdg/autostart"
+install -m 0755 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello" "${CHROOT}/opt/bacha-os-hello/"
+install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello.svg" "${CHROOT}/opt/bacha-os-hello/"
+install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello.desktop" "${CHROOT}/usr/share/applications/"
+install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello.desktop" "${CHROOT}/etc/skel/Desktop/"
+install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello-autostart.desktop" "${CHROOT}/etc/xdg/autostart/"
+chmod +x "${CHROOT}/etc/skel/Desktop/"*.desktop
 
-# === Debug trước khi gọi xorriso: kiểm tra isohdpfx.bin và thư mục isolinux ===
-echo "=== Kiểm tra isohdpfx.bin ==="
-ls -la /usr/lib/ISOLINUX/isohdpfx.bin 2>/dev/null || \
-  find / -name "isohdpfx.bin" 2>/dev/null
+install -d "${CHROOT}/usr/share/plymouth/themes/bacha"
+install -m 0644 "${ROOT_DIR}/assets/plymouth/bacha-logo-512.png" "${CHROOT}/usr/share/plymouth/themes/bacha/"
+install -m 0644 "${ROOT_DIR}/assets/plymouth/bacha.plymouth" "${CHROOT}/usr/share/plymouth/themes/bacha/"
+install -m 0644 "${ROOT_DIR}/assets/plymouth/bacha.script" "${CHROOT}/usr/share/plymouth/themes/bacha/"
 
-echo "=== Kiểm tra thư mục isolinux trong ISO gốc ==="
-ls -la $EXTRACT/isolinux/ 2>/dev/null || echo "Không có thư mục isolinux trong ISO gốc"
+install -d "${CHROOT}/usr/share/backgrounds/bacha"
+install -m 0644 "${ROOT_DIR}/assets/wallpaper/"*.jpg "${CHROOT}/usr/share/backgrounds/bacha/"
 
-# === Cấu trúc boot/grub ===
-echo "=== Cấu trúc boot/grub ==="
-find "$EXTRACT/boot" -type f 2>/dev/null
-echo "=== Cấu trúc EFI (nếu có) ==="
-find "$EXTRACT" -iname "*.img" -o -iname "*efi*" 2>/dev/null | head -20
+echo "==> Đóng gói filesystem.squashfs"
+mksquashfs "$CHROOT" "${EXTRACT}/casper/filesystem.squashfs" -comp zstd -Xcompression-level 19 -noappend
+rm -rf "$CHROOT"
+printf '%s' "$(du -sx --block-size=1 "${EXTRACT}/casper/filesystem.squashfs" | cut -f1)" > "${EXTRACT}/casper/filesystem.size"
 
+install -d "${EXTRACT}/preseed"
+install -m 0644 "${ROOT_DIR}/config/preseed.cfg" "${EXTRACT}/preseed/bacha.seed"
+
+if [[ -f "${EXTRACT}/boot/grub/grub.cfg" ]]; then
+  sed -i "s/Linux Mint [0-9.]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g; s/Start Linux Mint/Khởi động Bạc Hà OS/g" "${EXTRACT}/boot/grub/grub.cfg"
+fi
+if [[ -f "${EXTRACT}/isolinux/txt.cfg" ]]; then
+  sed -i "s/Linux Mint [0-9.]* [A-Za-z]*/Bạc Hà OS ${VERSION}/g" "${EXTRACT}/isolinux/txt.cfg"
+fi
+if [[ -f "${EXTRACT}/isolinux/isolinux.cfg" ]]; then
+  sed -i "s/Linux Mint/Bạc Hà OS/g" "${EXTRACT}/isolinux/isolinux.cfg"
+fi
+
+(
+  cd "$EXTRACT"
+  find . -type f -not -path "./isolinux/*" -not -path "./casper/filesystem.squashfs" -print0 \
+    | sort -z \
+    | xargs -0 md5sum > md5sum.txt
+)
+
+ISOHYBRID_MBR=/usr/lib/ISOLINUX/isohdpfx.bin
+if [[ ! -f "$ISOHYBRID_MBR" ]]; then
+  echo "Không tìm thấy isohdpfx.bin tại ${ISOHYBRID_MBR}" >&2
+  exit 69
+fi
+if [[ ! -f "${EXTRACT}/isolinux/isolinux.bin" || ! -f "${EXTRACT}/boot/grub/efi.img" ]]; then
+  echo "ISO gốc không có thành phần boot BIOS/UEFI bắt buộc" >&2
+  exit 65
+fi
+
+echo "==> Tạo ISO ${ISO_FILENAME}"
 xorriso -as mkisofs \
-  -iso-level 3 \
-  -r -V "BACHAOS_${EDITION^^}" \
-  -J -joliet-long \
-  -isohybrid-mbr /usr/lib/ISOLINUX/isohdpfx.bin \
-  -c isolinux/boot.cat \
-  -b isolinux/isolinux.bin \
-  -no-emul-boot -boot-load-size 4 -boot-info-table \
-  -eltorito-alt-boot \
-  -e boot/grub/efi.img \
-  -no-emul-boot -isohybrid-gpt-basdat \
-  -o output/bac-ha-os-${EDITION}-${VERSION}-$(date +%Y%m%d).iso \
-  $EXTRACT
+  -iso-level 3 -r -V "BACHAOS_${EDITION^^}" -J -joliet-long \
+  -isohybrid-mbr "$ISOHYBRID_MBR" \
+  -c isolinux/boot.cat -b isolinux/isolinux.bin -no-emul-boot -boot-load-size 4 -boot-info-table \
+  -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat \
+  -o "$ISO_OUTPUT" "$EXTRACT"
+
+ISO_SHA256=$(sha256sum "$ISO_OUTPUT" | awk '{print $1}')
+printf '%s  %s\n' "$ISO_SHA256" "$ISO_FILENAME" > "${ISO_OUTPUT}.sha256"
+cat > "${OUTPUT_DIR}/release-${EDITION}.env" <<EOF
+EDITION=${EDITION}
+ISO_FILENAME=${ISO_FILENAME}
+ISO_SHA256=${ISO_SHA256}
+SOURCEFORGE_ISO_URL=https://sourceforge.net/projects/bac-ha-os/files/${ISO_FILENAME}/download
+SOURCEFORGE_SHA256_URL=https://sourceforge.net/projects/bac-ha-os/files/${ISO_FILENAME}.sha256/download
+EOF
+
+echo "==> Hoàn tất ${ISO_FILENAME}"

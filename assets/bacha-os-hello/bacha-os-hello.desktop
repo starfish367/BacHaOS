@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=BacHa OS Hello
+Comment=Gắn an toàn các phân vùng NTFS chưa được mount
+Exec=/opt/bacha-os-hello/bacha-os-hello --mount
+Icon=/opt/bacha-os-hello/bacha-os-hello.svg
+Terminal=false
+Categories=Utility;
+Keywords=NTFS;disk;mount;ổ cứng;phân vùng;
+StartupNotify=true

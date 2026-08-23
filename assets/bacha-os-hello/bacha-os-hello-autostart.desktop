@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=BacHa OS Hello — NTFS automount
+Comment=Gắn an toàn các phân vùng NTFS khi đăng nhập
+Exec=/opt/bacha-os-hello/bacha-os-hello --autostart
+TryExec=/opt/bacha-os-hello/bacha-os-hello
+Icon=/opt/bacha-os-hello/bacha-os-hello.svg
+Terminal=false
+OnlyShowIn=MATE;X-Cinnamon;GNOME;
+X-GNOME-Autostart-enabled=true
+X-MATE-Autostart-enabled=true
+NoDisplay=true

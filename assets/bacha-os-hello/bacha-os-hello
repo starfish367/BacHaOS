@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# BacHa OS Hello: safely mount unmounted NTFS data partitions for the active desktop user.
+set -uo pipefail
+
+APP_NAME="BacHa OS Hello"
+STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/bacha-os-hello"
+LOG_FILE="${STATE_DIR}/mount.log"
+MODE=${1:---mount}
+mkdir -p "$STATE_DIR"
+
+log_event() {
+  printf '%s\t%s\n' "$(date -Is)" "$*" >> "$LOG_FILE"
+}
+
+notify() {
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send --app-name="$APP_NAME" "$APP_NAME" "$1"
+  fi
+}
+
+show_dialog() {
+  local message=$1
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --info --title="$APP_NAME" --width=520 --text="$message"
+  else
+    notify "$message"
+  fi
+}
+
+list_ntfs_devices() {
+  lsblk -rpn -o PATH,TYPE,FSTYPE | awk '$2 == "part" && tolower($3) ~ /^ntfs/ {print $1}'
+}
+
+show_status() {
+  local devices device mounted_at status_text
+  devices=$(list_ntfs_devices)
+  if [[ -z "$devices" ]]; then
+    show_dialog "Không tìm thấy phân vùng NTFS nào trên máy này."
+    return 0
+  fi
+
+  status_text=$'Các phân vùng NTFS:\n'
+  while IFS= read -r device; do
+    mounted_at=$(lsblk -nrpo MOUNTPOINTS "$device" | head -n1)
+    if [[ -n "$mounted_at" ]]; then
+      status_text+="• ${device} — đã gắn tại ${mounted_at}"$'\n'
+    else
+      status_text+="• ${device} — chưa gắn"$'\n'
+    fi
+  done <<< "$devices"
+  show_dialog "$status_text"
+}
+
+mount_ntfs_partitions() {
+  local quiet=$1 device mounted_at mount_output
+  local -a mounted=() skipped=() failed=()
+  local summary
+
+  if ! command -v udisksctl >/dev/null 2>&1; then
+    show_dialog "Thiếu udisksctl. Hãy cài lại gói udisks2 hoặc liên hệ người quản trị hệ thống."
+    exit 1
+  fi
+
+  mapfile -t devices < <(list_ntfs_devices)
+  if [[ ${#devices[@]} -eq 0 ]]; then
+    [[ "$quiet" == false ]] && show_dialog "Không tìm thấy phân vùng NTFS nào để gắn."
+    return 0
+  fi
+
+  for device in "${devices[@]}"; do
+    mounted_at=$(lsblk -nrpo MOUNTPOINTS "$device" | head -n1)
+    if [[ -n "$mounted_at" ]]; then
+      skipped+=("${device} đã được gắn tại ${mounted_at}")
+      continue
+    fi
+
+    if mount_output=$(udisksctl mount -b "$device" --no-user-interaction 2>&1); then
+      mounted+=("${device}: ${mount_output}")
+      log_event "mounted ${device} ${mount_output}"
+    else
+      failed+=("${device}: ${mount_output}")
+      log_event "failed ${device} ${mount_output}"
+    fi
+  done
+
+  summary=$'Kết quả gắn phân vùng NTFS:\n'
+  if [[ ${#mounted[@]} -gt 0 ]]; then
+    summary+=$'\nĐã gắn thành công:\n'
+    for item in "${mounted[@]}"; do
+      summary+="• ${item}"$'\n'
+    done
+  fi
+  if [[ ${#skipped[@]} -gt 0 ]]; then
+    summary+=$'\nĐã bỏ qua:\n'
+    for item in "${skipped[@]}"; do
+      summary+="• ${item}"$'\n'
+    done
+  fi
+  if [[ ${#failed[@]} -gt 0 ]]; then
+    summary+=$'\nKhông thể gắn:\n'
+    for item in "${failed[@]}"; do
+      summary+="• ${item}"$'\n'
+    done
+    summary+=$'\nNếu đây là ổ Windows, hãy tắt hoàn toàn Windows và tắt Fast Startup trước khi thử lại. BacHa OS Hello không ép ghi vào phân vùng không an toàn.'
+  fi
+
+  if [[ "$quiet" == true ]]; then
+    [[ ${#failed[@]} -gt 0 ]] && notify "Có phân vùng NTFS chưa thể gắn. Mở BacHa OS Hello để xem chi tiết."
+  else
+    show_dialog "$summary"
+  fi
+}
+
+case "$MODE" in
+  --autostart) mount_ntfs_partitions true ;;
+  --mount) mount_ntfs_partitions false ;;
+  --status) show_status ;;
+  --help|-h)
+    printf '%s\n' "Cách dùng: bacha-os-hello [--mount|--status|--autostart]"
+    ;;
+  *)
+    printf '%s\n' "Tham số không hợp lệ: ${MODE}" >&2
+    exit 64
+    ;;
+esac
