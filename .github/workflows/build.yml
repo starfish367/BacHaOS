@@ -24,9 +24,9 @@ jobs:
       matrix:
         edition:
           - name: mate
-            iso_url: https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso
+            iso_url: https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-mate-64bit.iso
           - name: cinnamon
-            iso_url: https://mirrors.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso
+            iso_url: https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso
     steps:
       - uses: actions/checkout@v4
 
@@ -54,7 +54,9 @@ jobs:
             --output mint-base.iso "$ISO_URL"
           curl --fail --location --retry 4 --retry-all-errors --connect-timeout 30 \
             --output sha256sum.txt "${ISO_DIR}/sha256sum.txt"
-          grep -F "  ${ISO_NAME}" sha256sum.txt | sha256sum --check --status --strict
+          EXPECTED_SHA256="$(awk -v file="$ISO_NAME" '$2 == "*" file || $2 == file {print $1; exit}' sha256sum.txt)"
+          test -n "$EXPECTED_SHA256"
+          printf '%s  %s\n' "$EXPECTED_SHA256" mint-base.iso | sha256sum --check --status --strict
           test "$(stat -c%s mint-base.iso)" -gt 1000000000
 
       - name: Lint remaster scripts
