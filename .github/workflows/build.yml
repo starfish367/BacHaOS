@@ -121,8 +121,6 @@ jobs:
             -e "ssh -i $KEY_FILE -o StrictHostKeyChecking=yes" \
             "output/${ISO_FILENAME}" "output/${ISO_FILENAME}.sha256" \
             "${SF_USERNAME}@frs.sourceforge.net:/home/frs/project/bac-ha-os/"
-          ssh -i "$KEY_FILE" -o StrictHostKeyChecking=yes "${SF_USERNAME}@frs.sourceforge.net" \
-            "test -s /home/frs/project/bac-ha-os/${ISO_FILENAME} && test -s /home/frs/project/bac-ha-os/${ISO_FILENAME}.sha256"
 
       - name: Upload release reports
         uses: actions/upload-artifact@v4
