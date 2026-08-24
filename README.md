@@ -6,6 +6,10 @@
 
 Bạc Hà OS tùy biến Linux Mint với giao diện tiếng Việt, bộ gõ tiếng Việt và các ứng dụng thiết yếu. Dự án hướng đến trải nghiệm dễ dùng cho người mới làm quen Linux, đồng thời vẫn phù hợp với máy tính cấu hình vừa và thấp.
 
+## Website
+
+Trang giới thiệu, liên kết tải ISO, SHA-256, hướng dẫn USB boot, hướng dẫn cài LibreOffice và số liệu cộng đồng công khai có tại **[bachalos-5htcr64s.manus.space](https://bachalos-5htcr64s.manus.space/)**.
+
 ## Tính năng
 
 - Tiếng Việt và múi giờ `Asia/Ho_Chi_Minh` mặc định
@@ -18,6 +22,18 @@ Bạc Hà OS tùy biến Linux Mint với giao diện tiếng Việt, bộ gõ t
 - Hỗ trợ Wine/Bottles cho ứng dụng Windows
 - Font Unicode và các tiện ích thiết yếu được chuẩn bị sẵn
 - Quy trình build ISO tự động bằng GitHub Actions, có checksum SHA-256 và upload SourceForge
+
+## Ảnh chụp hệ thống
+
+Hai ảnh dưới đây được chụp từ **MATE v0.1.3 sau khi cài đặt**, không phải mockup. Chúng cho thấy desktop, shortcut OnlyOffice và cửa sổ BacHa OS Hello thật. Ảnh MATE/Cinnamon v1.0.0 sẽ chỉ được thêm sau khi boot kiểm chứng thành công trong môi trường đủ tài nguyên.
+
+![Desktop Bạc Hà OS MATE v0.1.3 sau khi cài đặt](docs/screenshots/v0.1.3/bac-ha-os-v0.1.3-mate-desktop-sau-cai-dat.png)
+
+![BacHa OS Hello trên MATE v0.1.3 sau khi cài đặt](docs/screenshots/v0.1.3/bac-ha-os-v0.1.3-bacha-os-hello-sau-cai-dat.png)
+
+## Cài LibreOffice khi cần
+
+Từ menu ứng dụng, mở **BacHa OS Hello**, chọn **Cài LibreOffice theo yêu cầu**, rồi xác nhận **Có**. Tiện ích sẽ tải và cài `libreoffice` cùng gói tiếng Việt `libreoffice-l10n-vi`; vì vậy máy cần có Internet trong lúc cài. LibreOffice không có sẵn trong ISO để giảm dung lượng tải xuống, còn OnlyOffice vẫn được cài sẵn.
 
 ## Bắt đầu nhanh
 
@@ -63,5 +79,4 @@ Phát hành theo [GNU GPL-3.0](LICENSE). Bạc Hà OS là một dự án cộng 
 ## Từ khóa
 
 `Linux Mint` · `Bac Ha OS` · `Bạc Hà OS` · `Vietnamese Linux` · `Linux remaster` · `MATE` · `Cinnamon` · `fcitx5-unikey` · `Vietnam`
-
 
