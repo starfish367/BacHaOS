@@ -29,6 +29,7 @@ if [[ ! -f "$ISO" ]]; then
   echo "Không tìm thấy ISO gốc: $ISO" >&2
   exit 66
 fi
+BASE_ISO_BYTES=$(stat -c '%s' "$ISO")
 
 require_commands=(mount umount rsync unsquashfs chroot mksquashfs xorriso md5sum sha256sum)
 for command_name in "${require_commands[@]}"; do
@@ -62,6 +63,7 @@ mkdir -p "$MOUNT" "$EXTRACT" "$OUTPUT_DIR"
 rm -f "${OUTPUT_DIR}/release-${EDITION}.env" \
   "${OUTPUT_DIR}/installed-packages-${EDITION}.txt" \
   "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt" \
+  "${OUTPUT_DIR}/size-${EDITION}.env" \
   "${ISO_OUTPUT}" "${ISO_OUTPUT}.sha256"
 
 echo "==> Mount ISO gốc: $(basename "$ISO")"
@@ -123,21 +125,32 @@ install -m 0755 "${ROOT_DIR}/assets/onlyoffice-templates/open-powerpoint.sh" "${
 install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/word.desktop" "${CHROOT}/usr/share/applications/"
 install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/excel.desktop" "${CHROOT}/usr/share/applications/"
 install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/powerpoint.desktop" "${CHROOT}/usr/share/applications/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/onlyoffice.desktop" "${CHROOT}/usr/share/applications/"
 install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/word.desktop" "${CHROOT}/etc/skel/Desktop/"
 install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/excel.desktop" "${CHROOT}/etc/skel/Desktop/"
 install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/powerpoint.desktop" "${CHROOT}/etc/skel/Desktop/"
+install -m 0644 "${ROOT_DIR}/assets/onlyoffice-templates/onlyoffice.desktop" "${CHROOT}/etc/skel/Desktop/"
 
 if [[ -f "${CHROOT}/usr/share/applications/google-chrome.desktop" ]]; then
   install -m 0644 "${CHROOT}/usr/share/applications/google-chrome.desktop" "${CHROOT}/etc/skel/Desktop/"
 fi
 
-install -d "${CHROOT}/opt/bacha-os-hello" "${CHROOT}/etc/xdg/autostart"
+install -d "${CHROOT}/opt/bacha-os-hello" "${CHROOT}/usr/lib/bacha-os" \
+  "${CHROOT}/etc/polkit-1/rules.d" "${CHROOT}/etc/xdg/autostart"
 install -m 0755 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello" "${CHROOT}/opt/bacha-os-hello/"
+install -m 0755 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-ntfs-mount" "${CHROOT}/usr/lib/bacha-os/"
+install -m 0755 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-install-libreoffice" "${CHROOT}/usr/lib/bacha-os/"
+install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/50-bacha-os-hello.rules" "${CHROOT}/etc/polkit-1/rules.d/"
 install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello.svg" "${CHROOT}/opt/bacha-os-hello/"
 install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello.desktop" "${CHROOT}/usr/share/applications/"
 install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello.desktop" "${CHROOT}/etc/skel/Desktop/"
 install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello-autostart.desktop" "${CHROOT}/etc/xdg/autostart/"
+install -d "${CHROOT}/usr/share/icons/hicolor/scalable/apps" "${CHROOT}/usr/share/icons/hicolor/512x512/apps"
+install -m 0644 "${ROOT_DIR}/assets/bacha-os-hello/bacha-os-hello.svg" "${CHROOT}/usr/share/icons/hicolor/scalable/apps/bacha-os.svg"
+install -m 0644 "${ROOT_DIR}/assets/plymouth/bacha-logo-512.png" "${CHROOT}/usr/share/icons/hicolor/512x512/apps/bacha-os.png"
 chmod +x "${CHROOT}/etc/skel/Desktop/"*.desktop
+chroot "${CHROOT}" update-desktop-database /usr/share/applications 2>/dev/null || true
+chroot "${CHROOT}" gtk-update-icon-cache -f /usr/share/icons/hicolor 2>/dev/null || true
 
 install -d "${CHROOT}/usr/share/plymouth/themes/bacha"
 install -m 0644 "${ROOT_DIR}/assets/plymouth/bacha-logo-512.png" "${CHROOT}/usr/share/plymouth/themes/bacha/"
@@ -146,6 +159,10 @@ install -m 0644 "${ROOT_DIR}/assets/plymouth/bacha.script" "${CHROOT}/usr/share/
 
 install -d "${CHROOT}/usr/share/backgrounds/bacha"
 install -m 0644 "${ROOT_DIR}/assets/wallpaper/"*.jpg "${CHROOT}/usr/share/backgrounds/bacha/"
+
+install -d "${CHROOT}/etc/skel/.config/cinnamon/spices/menu@cinnamon.org"
+install -m 0644 "${ROOT_DIR}/assets/branding/cinnamon-menu.json" \
+  "${CHROOT}/etc/skel/.config/cinnamon/spices/menu@cinnamon.org/0.json"
 
 echo "==> Đóng gói filesystem.squashfs"
 mksquashfs "$CHROOT" "${EXTRACT}/casper/filesystem.squashfs" -comp zstd -Xcompression-level 19 -noappend
@@ -190,12 +207,23 @@ xorriso -as mkisofs \
   -eltorito-alt-boot -e boot/grub/efi.img -no-emul-boot -isohybrid-gpt-basdat \
   -o "$ISO_OUTPUT" "$EXTRACT"
 
+SQUASHFS_BYTES=$(stat -c '%s' "${EXTRACT}/casper/filesystem.squashfs")
+ISO_BYTES=$(stat -c '%s' "$ISO_OUTPUT")
 ISO_SHA256=$(sha256sum "$ISO_OUTPUT" | awk '{print $1}')
 printf '%s  %s\n' "$ISO_SHA256" "$ISO_FILENAME" > "${ISO_OUTPUT}.sha256"
+cat > "${OUTPUT_DIR}/size-${EDITION}.env" <<EOF
+EDITION=${EDITION}
+BASE_ISO_BYTES=${BASE_ISO_BYTES}
+SQUASHFS_BYTES=${SQUASHFS_BYTES}
+ISO_BYTES=${ISO_BYTES}
+EOF
 cat > "${OUTPUT_DIR}/release-${EDITION}.env" <<EOF
 EDITION=${EDITION}
 ISO_FILENAME=${ISO_FILENAME}
 ISO_SHA256=${ISO_SHA256}
+BASE_ISO_BYTES=${BASE_ISO_BYTES}
+SQUASHFS_BYTES=${SQUASHFS_BYTES}
+ISO_BYTES=${ISO_BYTES}
 SOURCEFORGE_ISO_URL=https://sourceforge.net/projects/bac-ha-os/files/${ISO_FILENAME}/download
 SOURCEFORGE_SHA256_URL=https://sourceforge.net/projects/bac-ha-os/files/${ISO_FILENAME}.sha256/download
 EOF

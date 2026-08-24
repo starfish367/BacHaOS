@@ -11,11 +11,13 @@ Bạc Hà OS tùy biến Linux Mint với giao diện tiếng Việt, bộ gõ t
 - Tiếng Việt và múi giờ `Asia/Ho_Chi_Minh` mặc định
 - Bộ gõ tiếng Việt `fcitx5-unikey`
 - Hai phiên bản giao diện: **MATE** nhẹ và **Cinnamon** hiện đại
-- OnlyOffice, Firefox và Google Chrome
+- OnlyOffice và Google Chrome; launcher OnlyOffice có icon nhận diện rõ ràng
+- LibreOffice có thể cài theo yêu cầu qua BacHa OS Hello, không làm nặng ISO mặc định
+- BacHa OS Hello tự gắn NTFS qua `ntfs-3g` tại `/mnt/ocung1`, `/mnt/ocung2`… và chỉ đọc khi Windows đang hibernate/Fast Startup
 - Lối tắt Zalo Web và YouTube Web
 - Hỗ trợ Wine/Bottles cho ứng dụng Windows
 - Font Unicode và các tiện ích thiết yếu được chuẩn bị sẵn
-- Quy trình build ISO tự động bằng GitHub Actions
+- Quy trình build ISO tự động bằng GitHub Actions, có checksum SHA-256 và upload SourceForge
 
 ## Bắt đầu nhanh
 

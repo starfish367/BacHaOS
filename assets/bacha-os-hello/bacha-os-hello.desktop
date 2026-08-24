@@ -1,10 +1,10 @@
 [Desktop Entry]
 Type=Application
 Name=BacHa OS Hello
-Comment=Gắn an toàn các phân vùng NTFS chưa được mount
-Exec=/opt/bacha-os-hello/bacha-os-hello --mount
+Comment=Gắn ổ NTFS an toàn hoặc cài LibreOffice theo yêu cầu
+Exec=/opt/bacha-os-hello/bacha-os-hello --menu
 Icon=/opt/bacha-os-hello/bacha-os-hello.svg
 Terminal=false
 Categories=Utility;
-Keywords=NTFS;disk;mount;ổ cứng;phân vùng;
+Keywords=NTFS;disk;mount;LibreOffice;ổ cứng;phân vùng;
 StartupNotify=true

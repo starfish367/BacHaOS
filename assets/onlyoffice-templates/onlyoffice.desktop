@@ -1,0 +1,14 @@
+[Desktop Entry]
+Type=Application
+Name=ONLYOFFICE
+Name[vi]=ONLYOFFICE
+Comment=Soạn thảo tài liệu, bảng tính và trình chiếu
+Comment[vi]=Soạn thảo tài liệu, bảng tính và trình chiếu
+Exec=/usr/bin/desktopeditors %F
+TryExec=/usr/bin/desktopeditors
+Icon=onlyoffice-desktopeditors
+Terminal=false
+Categories=Office;
+MimeType=application/vnd.openxmlformats-officedocument.wordprocessingml.document;application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;application/vnd.openxmlformats-officedocument.presentationml.presentation;
+StartupNotify=true
+StartupWMClass=DesktopEditors

@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-# BacHa OS Hello: safely mount unmounted NTFS data partitions for the active desktop user.
+# BacHa OS Hello: one-click NTFS mount and optional LibreOffice installation for the active desktop user.
 set -uo pipefail
 
 APP_NAME="BacHa OS Hello"
 STATE_DIR="${XDG_STATE_HOME:-${HOME}/.local/state}/bacha-os-hello"
 LOG_FILE="${STATE_DIR}/mount.log"
 MODE=${1:---mount}
+MOUNT_HELPER=${BACHA_MOUNT_HELPER:-/usr/lib/bacha-os/bacha-os-ntfs-mount}
+LIBREOFFICE_HELPER=${BACHA_LIBREOFFICE_HELPER:-/usr/lib/bacha-os/bacha-os-install-libreoffice}
 mkdir -p "$STATE_DIR"
 
 log_event() {
@@ -31,6 +33,20 @@ list_ntfs_devices() {
   lsblk -rpn -o PATH,TYPE,FSTYPE | awk '$2 == "part" && tolower($3) ~ /^ntfs/ {print $1}'
 }
 
+run_privileged() {
+  local helper=$1
+  shift
+  if ! command -v pkexec >/dev/null 2>&1; then
+    printf '%s\n' 'Thiếu pkexec; không thể chạy tác vụ quản trị BacHa OS Hello.' >&2
+    return 1
+  fi
+  if [[ ! -x $helper ]]; then
+    printf 'Không tìm thấy helper BacHa OS Hello: %s\n' "$helper" >&2
+    return 1
+  fi
+  pkexec "$helper" "$@"
+}
+
 show_status() {
   local devices device mounted_at status_text
   devices=$(list_ntfs_devices)
@@ -41,7 +57,7 @@ show_status() {
 
   status_text=$'Các phân vùng NTFS:\n'
   while IFS= read -r device; do
-    mounted_at=$(lsblk -nrpo MOUNTPOINTS "$device" | head -n1)
+    mounted_at=$(findmnt -rn -S "$device" -o TARGET 2>/dev/null | head -n1 || true)
     if [[ -n "$mounted_at" ]]; then
       status_text+="• ${device} — đã gắn tại ${mounted_at}"$'\n'
     else
@@ -52,56 +68,58 @@ show_status() {
 }
 
 mount_ntfs_partitions() {
-  local quiet=$1 device mounted_at mount_output
-  local -a mounted=() skipped=() failed=()
-  local summary
+  local quiet=$1 output line state device target detail
+  local -a mounted=() readonly=() skipped=() failed=()
+  local summary=$'Kết quả gắn phân vùng NTFS:\n'
 
-  if ! command -v udisksctl >/dev/null 2>&1; then
-    show_dialog "Thiếu udisksctl. Hãy cài lại gói udisks2 hoặc liên hệ người quản trị hệ thống."
-    exit 1
+  if ! output=$(run_privileged "$MOUNT_HELPER" --quiet 2>&1); then
+    log_event "helper-failed ${output}"
+    [[ "$quiet" == false ]] && show_dialog "Không thể chạy tác vụ gắn NTFS.\n${output}"
+    return 1
   fi
 
-  mapfile -t devices < <(list_ntfs_devices)
-  if [[ ${#devices[@]} -eq 0 ]]; then
-    [[ "$quiet" == false ]] && show_dialog "Không tìm thấy phân vùng NTFS nào để gắn."
-    return 0
-  fi
+  while IFS= read -r line; do
+    IFS='|' read -r state device target detail <<< "$line"
+    case "$state" in
+      MOUNTED)
+        mounted+=("${device} → ${target} (đọc/ghi)")
+        log_event "mounted ${device} ${target} rw"
+        ;;
+      READONLY)
+        readonly+=("${device} → ${target} (chỉ đọc)")
+        log_event "mounted ${device} ${target} ro ${detail}"
+        ;;
+      SKIPPED)
+        skipped+=("${device} đã được gắn tại ${target}")
+        log_event "skipped ${device} ${target}"
+        ;;
+      FAILED)
+        failed+=("${device}: ${target}")
+        log_event "failed ${device} ${target}"
+        ;;
+      NONE)
+        [[ "$quiet" == false ]] && show_dialog "Không tìm thấy phân vùng NTFS nào để gắn."
+        return 0
+        ;;
+    esac
+  done <<< "$output"
 
-  for device in "${devices[@]}"; do
-    mounted_at=$(lsblk -nrpo MOUNTPOINTS "$device" | head -n1)
-    if [[ -n "$mounted_at" ]]; then
-      skipped+=("${device} đã được gắn tại ${mounted_at}")
-      continue
-    fi
-
-    if mount_output=$(udisksctl mount -b "$device" --no-user-interaction 2>&1); then
-      mounted+=("${device}: ${mount_output}")
-      log_event "mounted ${device} ${mount_output}"
-    else
-      failed+=("${device}: ${mount_output}")
-      log_event "failed ${device} ${mount_output}"
-    fi
-  done
-
-  summary=$'Kết quả gắn phân vùng NTFS:\n'
   if [[ ${#mounted[@]} -gt 0 ]]; then
-    summary+=$'\nĐã gắn thành công:\n'
-    for item in "${mounted[@]}"; do
-      summary+="• ${item}"$'\n'
-    done
+    summary+=$'\nĐã gắn đọc/ghi:\n'
+    for item in "${mounted[@]}"; do summary+="• ${item}"$'\n'; done
+  fi
+  if [[ ${#readonly[@]} -gt 0 ]]; then
+    summary+=$'\nĐã gắn chỉ đọc để bảo vệ dữ liệu Windows:\n'
+    for item in "${readonly[@]}"; do summary+="• ${item}"$'\n'; done
   fi
   if [[ ${#skipped[@]} -gt 0 ]]; then
     summary+=$'\nĐã bỏ qua:\n'
-    for item in "${skipped[@]}"; do
-      summary+="• ${item}"$'\n'
-    done
+    for item in "${skipped[@]}"; do summary+="• ${item}"$'\n'; done
   fi
   if [[ ${#failed[@]} -gt 0 ]]; then
     summary+=$'\nKhông thể gắn:\n'
-    for item in "${failed[@]}"; do
-      summary+="• ${item}"$'\n'
-    done
-    summary+=$'\nNếu đây là ổ Windows, hãy tắt hoàn toàn Windows và tắt Fast Startup trước khi thử lại. BacHa OS Hello không ép ghi vào phân vùng không an toàn.'
+    for item in "${failed[@]}"; do summary+="• ${item}"$'\n'; done
+    summary+=$'\nHãy tắt hoàn toàn Windows và Fast Startup trước khi thử lại. BacHa OS Hello không xóa hiberfile hoặc ép ghi dữ liệu.'
   fi
 
   if [[ "$quiet" == true ]]; then
@@ -111,12 +129,46 @@ mount_ntfs_partitions() {
   fi
 }
 
+install_libreoffice() {
+  local output
+  if command -v zenity >/dev/null 2>&1; then
+    zenity --question --title="$APP_NAME" --width=520 \
+      --text="LibreOffice không được cài sẵn để ISO nhẹ hơn.\n\nCài LibreOffice và gói tiếng Việt ngay bây giờ?" || return 0
+  fi
+  if output=$(run_privileged "$LIBREOFFICE_HELPER" 2>&1); then
+    log_event "libreoffice-installed"
+    show_dialog "${output}"
+  else
+    log_event "libreoffice-failed ${output}"
+    show_dialog "Không thể cài LibreOffice.\n${output}"
+    return 1
+  fi
+}
+
+show_menu() {
+  local action
+  if ! command -v zenity >/dev/null 2>&1; then
+    mount_ntfs_partitions false
+    return
+  fi
+  action=$(zenity --list --title="$APP_NAME" --width=520 --height=300 --hide-header \
+    --text="Chọn tác vụ:" --column="Tác vụ" \
+    "Gắn ổ NTFS" "Cài LibreOffice theo yêu cầu" "Xem trạng thái ổ NTFS") || return 0
+  case "$action" in
+    "Gắn ổ NTFS") mount_ntfs_partitions false ;;
+    "Cài LibreOffice theo yêu cầu") install_libreoffice ;;
+    "Xem trạng thái ổ NTFS") show_status ;;
+  esac
+}
+
 case "$MODE" in
   --autostart) mount_ntfs_partitions true ;;
   --mount) mount_ntfs_partitions false ;;
+  --install-libreoffice) install_libreoffice ;;
+  --menu) show_menu ;;
   --status) show_status ;;
   --help|-h)
-    printf '%s\n' "Cách dùng: bacha-os-hello [--mount|--status|--autostart]"
+    printf '%s\n' "Cách dùng: bacha-os-hello [--menu|--mount|--status|--install-libreoffice|--autostart]"
     ;;
   *)
     printf '%s\n' "Tham số không hợp lệ: ${MODE}" >&2

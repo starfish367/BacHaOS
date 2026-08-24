@@ -1,0 +1,13 @@
+// BacHa OS Hello may run only these fixed helpers for a local, active desktop user.
+const bachaHelpers = [
+  "/usr/lib/bacha-os/bacha-os-ntfs-mount",
+  "/usr/lib/bacha-os/bacha-os-install-libreoffice",
+];
+
+polkit.addRule(function(action, subject) {
+  if (action.id === "org.freedesktop.policykit.exec" &&
+      subject.local && subject.active &&
+      bachaHelpers.indexOf(action.lookup("program")) !== -1) {
+    return polkit.Result.YES;
+  }
+});

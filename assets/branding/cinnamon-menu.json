@@ -1,0 +1,14 @@
+{
+  "menu-custom": {
+    "value": true
+  },
+  "menu-icon": {
+    "value": "bacha-os"
+  },
+  "menu-icon-size": {
+    "value": 28
+  },
+  "menu-label": {
+    "value": ""
+  }
+}

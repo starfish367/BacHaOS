@@ -1,14 +1,18 @@
 # BacHa OS Hello
 
-**BacHa OS Hello** là tiện ích một chạm để người dùng gắn các phân vùng NTFS dữ liệu sau khi đăng nhập vào Bạc Hà OS. Ứng dụng nằm trên Desktop và trong menu hệ thống; đồng thời một tác vụ autostart chạy lặng lẽ khi vào MATE hoặc Cinnamon.
+**BacHa OS Hello** là tiện ích một chạm của Bạc Hà OS v1.0. Ứng dụng nằm trên Desktop và trong menu hệ thống. Khi đăng nhập MATE hoặc Cinnamon, tác vụ autostart sẽ quét các phân vùng NTFS chưa gắn và thử gắn chúng một cách an toàn.
 
-## Nguyên tắc an toàn
+## Gắn ổ NTFS
 
-Ứng dụng chỉ tìm các phân vùng có filesystem NTFS chưa được mount. Mọi phân vùng đã được gắn kết đều bị bỏ qua. Thao tác mount đi qua `udisksctl` trong phiên người dùng, do đó sử dụng các tuỳ chọn an toàn của UDisks và không cần script chạy quyền root. Nếu phân vùng Windows đang ngủ đông hoặc Fast Startup đang bật, ứng dụng không ép ghi; thay vào đó, nó báo lỗi để người dùng tắt hoàn toàn Windows trước khi thử lại.
+Các phân vùng NTFS được gắn tuần tự bằng `ntfs-3g` tại `/mnt/ocung1`, `/mnt/ocung2` và tiếp tục tăng số khi có nhiều ổ. Tệp tạo trong ổ dùng UID/GID của người dùng desktop hiện tại, có `windows_names` để tránh đặt tên không tương thích Windows, cùng `noatime,norecover` để không tự ý dọn journal Windows.
 
-## Cách dùng
+Nếu Windows đang hibernate hoặc Fast Startup làm phân vùng không thể gắn đọc-ghi, BacHa OS Hello chỉ thử gắn **chỉ đọc**. Tiện ích không dùng `remove_hiberfile`, không ép ghi và không xóa phiên Windows đã lưu. Muốn gắn đọc-ghi trở lại, hãy khởi động vào Windows, tắt hoàn toàn máy và tắt Fast Startup trước khi quay lại Bạc Hà OS.
 
-Mở **BacHa OS Hello** rồi bấm một lần để ứng dụng quét và gắn các phân vùng NTFS phù hợp. Khi có kết quả, cửa sổ sẽ cho biết phân vùng nào đã gắn, phân vùng nào đã được gắn từ trước và phân vùng nào cần xử lý thêm. Nhật ký theo người dùng được lưu ở `~/.local/state/bacha-os-hello/mount.log`.
+Kết quả mỗi lần chạy được lưu trong `~/.local/state/bacha-os-hello/mount.log`. Mở BacHa OS Hello để chọn gắn ổ, xem trạng thái hoặc chạy lựa chọn cài LibreOffice.
+
+## LibreOffice theo yêu cầu
+
+OnlyOffice là bộ văn phòng mặc định và có launcher/icon riêng trên Desktop/menu. Để giảm dung lượng ISO, LibreOffice không được cài sẵn. Người dùng có thể chọn **Cài LibreOffice theo yêu cầu** trong BacHa OS Hello; hệ thống sẽ hỏi xác nhận, tải gói LibreOffice và gói tiếng Việt từ kho phần mềm khi có kết nối mạng.
 
 ## Tắt tự động gắn kết
 
@@ -21,8 +25,6 @@ Hidden=true
 
 ## Tham khảo
 
-[1] https://manpages.ubuntu.com/manpages/bionic/man1/udisksctl.1.html — `udisksctl` mount qua UDisks.
+[1] https://linux.die.net/man/8/mount.ntfs-3g — tài liệu `mount.ntfs-3g`, gồm quyền sở hữu, `windows_names`, mount chỉ đọc và cảnh báo với `remove_hiberfile`.
 
-[2] https://storaged.org/udisks/docs/mount_options.html — chính sách mount option và bảo mật UDisks.
-
-[3] https://specifications.freedesktop.org/autostart/latest/ — chuẩn autostart cho desktop Linux.
+[2] https://specifications.freedesktop.org/autostart/latest/ — chuẩn autostart cho desktop Linux.

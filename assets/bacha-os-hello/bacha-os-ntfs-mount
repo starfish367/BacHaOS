@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+# Privileged helper for BacHa OS Hello. It accepts no device input and only mounts detected NTFS partitions.
+set -Eeuo pipefail
+
+MOUNT_ROOT=${BACHA_MOUNT_ROOT:-/mnt}
+
+if [[ $(id -u) -ne 0 ]]; then
+  printf '%s\n' 'FAILED|system|BacHa OS Hello cần quyền quản trị để tạo điểm gắn /mnt/ocungN.'
+  exit 1
+fi
+
+CALLER_UID=${PKEXEC_UID:-}
+if [[ ! $CALLER_UID =~ ^[0-9]+$ ]] || [[ $CALLER_UID -lt 1000 ]]; then
+  printf '%s\n' 'FAILED|system|Không xác định được người dùng desktop đang gọi BacHa OS Hello.'
+  exit 1
+fi
+CALLER_GID=$(id -g "$CALLER_UID")
+
+list_ntfs_devices() {
+  lsblk -rpn -o PATH,TYPE,FSTYPE | awk '$2 == "part" && tolower($3) ~ /^ntfs/ {print $1}'
+}
+
+next_mountpoint() {
+  local number=1 target
+  while :; do
+    target="${MOUNT_ROOT}/ocung${number}"
+    if ! mountpoint -q "$target"; then
+      printf '%s\n' "$target"
+      return 0
+    fi
+    ((number += 1))
+  done
+}
+
+mapfile -t devices < <(list_ntfs_devices)
+if [[ ${#devices[@]} -eq 0 ]]; then
+  printf '%s\n' 'NONE|Không tìm thấy phân vùng NTFS.'
+  exit 0
+fi
+
+for device in "${devices[@]}"; do
+  existing_target=$(findmnt -rn -S "$device" -o TARGET 2>/dev/null | head -n1 || true)
+  if [[ -n $existing_target ]]; then
+    printf 'SKIPPED|%s|%s\n' "$device" "$existing_target"
+    continue
+  fi
+
+  target=$(next_mountpoint)
+  mkdir -p "$target"
+  rw_options="uid=${CALLER_UID},gid=${CALLER_GID},umask=022,windows_names,noatime,norecover"
+  if rw_error=$(ntfs-3g -o "$rw_options" "$device" "$target" 2>&1); then
+    printf 'MOUNTED|%s|%s|rw\n' "$device" "$target"
+    continue
+  fi
+
+  ro_options="ro,uid=${CALLER_UID},gid=${CALLER_GID},umask=022,windows_names,noatime,norecover"
+  if ro_error=$(ntfs-3g -o "$ro_options" "$device" "$target" 2>&1); then
+    printf 'READONLY|%s|%s|Windows đang hibernate hoặc journal chưa sạch; chỉ đọc.\n' "$device" "$target"
+    continue
+  fi
+
+  rmdir "$target" 2>/dev/null || true
+  printf 'FAILED|%s|%s\n' "$device" "${rw_error//$'\n'/ }"
+  printf 'DETAIL|%s\n' "${ro_error//$'\n'/ }"
+done

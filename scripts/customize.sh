@@ -77,6 +77,15 @@ fc-cache -f -v
 if [ -f /tmp/remove.list ]; then
     xargs -r -a /tmp/remove.list apt-get purge -y || true
 fi
+
+# Firefox và LibreOffice là ứng dụng tùy chọn trong v1.0: OnlyOffice vẫn có sẵn,
+# còn LibreOffice được BacHa OS Hello cài theo yêu cầu khi người dùng cần.
+mapfile -t optional_desktop_apps < <(
+  dpkg-query -W -f='${binary:Package}\n' 'firefox*' 'libreoffice*' 2>/dev/null || true
+)
+if [ ${#optional_desktop_apps[@]} -gt 0 ]; then
+  apt-get purge -y "${optional_desktop_apps[@]}"
+fi
 apt-get autoremove -y --purge
 
 # --- Tắt/mask service không cần chạy nền ---
@@ -136,6 +145,12 @@ picture-filename='/usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg'
 
 [org/cinnamon/desktop/background]
 picture-uri='file:///usr/share/backgrounds/bacha/02-ruong-bac-thang.jpg'
+EOF
+
+# Dùng biểu tượng Bạc Hà OS cho Mintmenu MATE thay biểu tượng Linux Mint mặc định.
+cat > /etc/dconf/db/bacha.d/02-branding <<'EOF'
+[com/linuxmint/mintmenu]
+applet-icon='bacha-os'
 EOF
 
 dconf update
