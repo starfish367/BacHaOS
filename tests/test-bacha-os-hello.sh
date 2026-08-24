@@ -11,7 +11,10 @@ cat > "$TEST_DIR/bin/lsblk" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
   *"PATH,TYPE,FSTYPE"*)
-    printf '%s\n' '/dev/sda2 part ntfs' '/dev/sdb1 part ntfs'
+    case "${LSBLK_MODE:-mixed}" in
+      none) ;;
+      *) printf '%s\n' '/dev/sda2 part ntfs' '/dev/sdb1 part ntfs' ;;
+    esac
     ;;
   *"MOUNTPOINTS /dev/sda2"*)
     printf '%s\n' ''
@@ -44,12 +47,21 @@ export HOME="$TEST_DIR/home"
 export XDG_STATE_HOME="$TEST_DIR/state"
 export ZENITY_CAPTURE="$TEST_DIR/zenity.txt"
 
-bash "$ROOT_DIR/assets/bacha-os-hello/bacha-os-hello" --mount
+LSBLK_MODE=mixed bash "$ROOT_DIR/assets/bacha-os-hello/bacha-os-hello" --mount
 grep -F 'Đã gắn thành công' "$ZENITY_CAPTURE"
 grep -F '/dev/sda2' "$ZENITY_CAPTURE"
 grep -F 'Không thể gắn' "$ZENITY_CAPTURE"
 grep -F '/dev/sdb1' "$ZENITY_CAPTURE"
 grep -F 'mounted /dev/sda2' "$XDG_STATE_HOME/bacha-os-hello/mount.log"
 grep -F 'failed /dev/sdb1' "$XDG_STATE_HOME/bacha-os-hello/mount.log"
+
+: > "$ZENITY_CAPTURE"
+LSBLK_MODE=none bash "$ROOT_DIR/assets/bacha-os-hello/bacha-os-hello" --mount
+grep -F 'Không tìm thấy phân vùng NTFS nào để gắn' "$ZENITY_CAPTURE"
+
+: > "$ZENITY_CAPTURE"
+LSBLK_MODE=mixed bash "$ROOT_DIR/assets/bacha-os-hello/bacha-os-hello" --status
+grep -F 'Các phân vùng NTFS' "$ZENITY_CAPTURE"
+grep -F '/dev/sda2' "$ZENITY_CAPTURE"
 
 printf '%s\n' 'BacHa OS Hello mock test: OK'

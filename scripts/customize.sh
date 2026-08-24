@@ -1,8 +1,16 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
+set -Eeuo pipefail
 export DEBIAN_FRONTEND=noninteractive
 VERSION=${1:-0.1}
 EDITION=${2:-mate}
+
+apt_update() {
+  apt-get -o Acquire::Retries=3 update
+}
+
+apt_install() {
+  apt-get -o Acquire::Retries=3 install -y --no-install-recommends "$@"
+}
 
 # --- Locale + timezone tiếng Việt ---
 locale-gen vi_VN.UTF-8
@@ -14,47 +22,47 @@ echo "Asia/Ho_Chi_Minh" > /etc/timezone
 echo "ttf-mscorefonts-installer msttcorefonts/accepted-mscorefonts-eula select true" \
   | debconf-set-selections
 
-apt-get update
-apt-get install -y wget gnupg
+apt_update
+apt_install wget gnupg ca-certificates
 
 # --- Thêm repo OnlyOffice ---
 wget -qO- https://download.onlyoffice.com/GPG-KEY-ONLYOFFICE \
-  | gpg --dearmor -o /usr/share/keyrings/onlyoffice.gpg
+  | gpg --batch --yes --dearmor -o /usr/share/keyrings/onlyoffice.gpg
 echo "deb [signed-by=/usr/share/keyrings/onlyoffice.gpg] https://download.onlyoffice.com/repo/debian squeeze main" \
   > /etc/apt/sources.list.d/onlyoffice.list
 
 # --- Thêm repo Google Chrome ---
 wget -qO- https://dl.google.com/linux/linux_signing_key.pub \
-  | gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg
-echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" \
+  | gpg --batch --yes --dearmor -o /usr/share/keyrings/google-chrome.gpg
+echo "deb [signed-by=/usr/share/keyrings/google-chrome.gpg] https://dl.google.com/linux/chrome/deb/ stable main" \
   > /etc/apt/sources.list.d/google-chrome.list
 
 # --- Thêm repo WineHQ (noble = Ubuntu 24.04, base Mint 22) ---
 dpkg --add-architecture i386
 wget -qO- https://dl.winehq.org/wine-builds/winehq.key \
-  | gpg --dearmor -o /usr/share/keyrings/winehq.gpg
+  | gpg --batch --yes --dearmor -o /usr/share/keyrings/winehq.gpg
 echo "deb [signed-by=/usr/share/keyrings/winehq.gpg] https://dl.winehq.org/wine-builds/ubuntu/ noble main" \
   > /etc/apt/sources.list.d/winehq.list
 
 # --- Update 1 lần duy nhất sau khi đã thêm ĐỦ cả 3 repo ---
-apt-get update
+apt_update
 
 # --- Cài toàn bộ gói (1 lần duy nhất) ---
 if [ -f /tmp/packages.list ]; then
-    xargs -a /tmp/packages.list apt-get install -y
+    xargs -r -a /tmp/packages.list apt-get -o Acquire::Retries=3 install -y --no-install-recommends
 fi
-apt-get install -y google-chrome-stable
-apt-get install -y fcitx5 fcitx5-unikey fcitx5-config-qt
+apt_install google-chrome-stable
+apt_install fcitx5 fcitx5-unikey fcitx5-config-qt
 im-config -n fcitx5
 
 # --- Codec đa phương tiện (nghe nhạc, xem video định dạng phổ biến) ---
-apt-get install -y ubuntu-restricted-extras || \
-apt-get install -y gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
+apt_install ubuntu-restricted-extras || \
+  apt_install gstreamer1.0-plugins-good gstreamer1.0-plugins-bad \
   gstreamer1.0-plugins-ugly gstreamer1.0-libav ffmpeg
 
 # --- Cài sẵn Flatpak + Flathub remote (để user tự cài Bottles/app khác sau nếu cần) ---
-apt-get install -y flatpak
-flatpak remote-add --if-not-exists flathub \
+apt_install flatpak
+flatpak --system remote-add --if-not-exists flathub \
   https://flathub.org/repo/flathub.flatpakrepo || true
 # Không cài Bottles sẵn — để ISO nhẹ, user tự cài qua Software Manager khi cần
 
@@ -67,9 +75,9 @@ fc-cache -f -v
 
 # --- Gỡ gói theo remove list ---
 if [ -f /tmp/remove.list ]; then
-    xargs -a /tmp/remove.list apt-get purge -y || true
+    xargs -r -a /tmp/remove.list apt-get purge -y || true
 fi
-apt-get autoremove -y
+apt-get autoremove -y --purge
 
 # --- Tắt/mask service không cần chạy nền ---
 SERVICES_DISABLE=(

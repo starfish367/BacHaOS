@@ -5,5 +5,5 @@ Exec=google-chrome-stable --app=https://youtube.com --class=YouTube
 Icon=/opt/youtube/youtube.png
 Terminal=false
 Type=Application
-Categories=Network;AudioVideo;
+Categories=AudioVideo;
 StartupWMClass=YouTube

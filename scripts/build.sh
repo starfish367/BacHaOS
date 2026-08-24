@@ -39,6 +39,7 @@ for command_name in "${require_commands[@]}"; do
 done
 
 unmount_chroot_mounts() {
+  [[ -d "$CHROOT" ]] || return 0
   chroot "$CHROOT" pkill -9 dbus-daemon 2>/dev/null || true
   for mount_path in "${CHROOT}/sys" "${CHROOT}/proc" "${CHROOT}/dev/pts" "${CHROOT}/dev"; do
     if mountpoint -q "$mount_path"; then
@@ -58,6 +59,10 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir -p "$MOUNT" "$EXTRACT" "$OUTPUT_DIR"
+rm -f "${OUTPUT_DIR}/release-${EDITION}.env" \
+  "${OUTPUT_DIR}/installed-packages-${EDITION}.txt" \
+  "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt" \
+  "${ISO_OUTPUT}" "${ISO_OUTPUT}.sha256"
 
 echo "==> Mount ISO gốc: $(basename "$ISO")"
 mount -o loop "$ISO" "$MOUNT"
@@ -68,7 +73,8 @@ umount "$MOUNT"
 for directory in dev dev/pts proc sys; do
   mount --bind "/${directory}" "${CHROOT}/${directory}"
 done
-cp /etc/resolv.conf "${CHROOT}/etc/resolv.conf"
+rm -f "${CHROOT}/etc/resolv.conf"
+cp -L /etc/resolv.conf "${CHROOT}/etc/resolv.conf"
 
 install -m 0755 "${ROOT_DIR}/scripts/customize.sh" "${CHROOT}/tmp/customize.sh"
 install -m 0644 "${ROOT_DIR}/config/packages.list" "${CHROOT}/tmp/packages.list"
@@ -78,7 +84,7 @@ rm -f "${CHROOT}/tmp/customize.sh" "${CHROOT}/tmp/packages.list" "${CHROOT}/tmp/
 
 echo "==> Thu thập báo cáo gói"
 if chroot "$CHROOT" /usr/bin/env bash -c 'command -v flatpak' >/dev/null 2>&1; then
-  chroot "$CHROOT" bash -c 'dbus-launch flatpak list --app --columns=application,name,version,size 2>/dev/null || true' \
+  chroot "$CHROOT" flatpak list --system --app --columns=application,name,version,size 2>/dev/null \
     > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt"
 else
   printf '%s\n' "Flatpak không có trong ISO gốc (${EDITION})" > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt"

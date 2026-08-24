@@ -6,7 +6,7 @@ on:
       version:
         description: "Phiên bản phát hành (ví dụ: 0.1.3)"
         required: true
-        default: "0.1.3"
+        default: "0.1.4"
 
 permissions:
   contents: write
@@ -16,7 +16,19 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  validate-release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate release version
+        env:
+          VERSION: ${{ github.event.inputs.version }}
+        run: |
+          set -euo pipefail
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          printf 'Validated release version: %s\n' "$VERSION"
+
   build:
+    needs: validate-release
     runs-on: ubuntu-latest
     timeout-minutes: 110
     strategy:
@@ -42,7 +54,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
-            squashfs-tools xorriso isolinux syslinux-utils genisoimage rsync p7zip-full curl
+            squashfs-tools xorriso isolinux syslinux-utils genisoimage rsync p7zip-full curl \
+            shellcheck desktop-file-utils
 
       - name: Download and verify Linux Mint base ISO (${{ matrix.edition.name }})
         run: |
@@ -50,12 +63,15 @@ jobs:
           ISO_URL='${{ matrix.edition.iso_url }}'
           ISO_NAME="$(basename "$ISO_URL")"
           ISO_DIR="$(dirname "$ISO_URL")"
-          curl --fail --location --retry 4 --retry-all-errors --connect-timeout 30 \
-            --output mint-base.iso "$ISO_URL"
-          curl --fail --location --retry 4 --retry-all-errors --connect-timeout 30 \
-            --output sha256sum.txt "${ISO_DIR}/sha256sum.txt"
+          download() {
+            curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
+              --connect-timeout 30 --max-time 1800 --speed-time 120 --speed-limit 1024 \
+              --output "$2" "$1"
+          }
+          download "$ISO_URL" mint-base.iso
+          download "${ISO_DIR}/sha256sum.txt" sha256sum.txt
           EXPECTED_SHA256="$(awk -v file="$ISO_NAME" '$2 == "*" file || $2 == file {print $1; exit}' sha256sum.txt)"
-          test -n "$EXPECTED_SHA256"
+          [[ "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]
           printf '%s  %s\n' "$EXPECTED_SHA256" mint-base.iso | sha256sum --check --status --strict
           test "$(stat -c%s mint-base.iso)" -gt 1000000000
 
@@ -63,8 +79,9 @@ jobs:
         run: |
           set -euo pipefail
           bash -n scripts/build.sh scripts/customize.sh
-          sudo apt-get install -y --no-install-recommends shellcheck
           shellcheck -x scripts/build.sh scripts/customize.sh assets/bacha-os-hello/bacha-os-hello
+          desktop-file-validate assets/bacha-os-hello/*.desktop assets/zalo/*.desktop assets/youtube/*.desktop
+          bash tests/test-bacha-os-hello.sh
 
       - name: Run remaster script
         run: |
@@ -81,6 +98,7 @@ jobs:
           test -s "output/${ISO_FILENAME}"
           test -s "output/${ISO_FILENAME}.sha256"
           test -s "output/installed-packages-${{ matrix.edition.name }}.txt"
+          test -s "output/flatpak-apps-${{ matrix.edition.name }}.txt"
           (cd output && sha256sum --check "${ISO_FILENAME}.sha256")
           grep -F "${ISO_SHA256}" "output/${ISO_FILENAME}.sha256"
 
@@ -94,13 +112,17 @@ jobs:
           test -n "$SF_USERNAME"
           source "output/release-${{ matrix.edition.name }}.env"
           install -d -m 700 ~/.ssh
-          printf '%s\n' "$SF_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H frs.sourceforge.net >> ~/.ssh/known_hosts
+          KEY_FILE="$(mktemp)"
+          trap 'rm -f "$KEY_FILE"' EXIT
+          printf '%s\n' "$SF_SSH_PRIVATE_KEY" > "$KEY_FILE"
+          chmod 600 "$KEY_FILE"
+          ssh-keyscan -T 20 -H frs.sourceforge.net >> ~/.ssh/known_hosts
           rsync --archive --verbose --partial --append-verify \
-            -e 'ssh -i ~/.ssh/id_rsa' \
+            -e "ssh -i $KEY_FILE -o StrictHostKeyChecking=yes" \
             "output/${ISO_FILENAME}" "output/${ISO_FILENAME}.sha256" \
             "${SF_USERNAME}@frs.sourceforge.net:/home/frs/project/bac-ha-os/"
+          ssh -i "$KEY_FILE" -o StrictHostKeyChecking=yes "${SF_USERNAME}@frs.sourceforge.net" \
+            "test -s /home/frs/project/bac-ha-os/${ISO_FILENAME} && test -s /home/frs/project/bac-ha-os/${ISO_FILENAME}.sha256"
 
       - name: Upload release reports
         uses: actions/upload-artifact@v4
@@ -141,6 +163,8 @@ jobs:
           for required_file in \
             output/installed-packages-mate.txt \
             output/installed-packages-cinnamon.txt \
+            output/flatpak-apps-mate.txt \
+            output/flatpak-apps-cinnamon.txt \
             "output/${MATE_FILENAME}.sha256" \
             "output/${CINNAMON_FILENAME}.sha256"; do
             test -s "$required_file"
@@ -148,7 +172,7 @@ jobs:
           cat > release-notes.md <<EOF
           ## Bạc Hà OS ${{ github.event.inputs.version }}
 
-          Bản phát hành này bổ sung **BacHa OS Hello**: tiện ích một chạm giúp gắn các phân vùng NTFS chưa được mount sau khi đăng nhập. Tiện ích dùng UDisks với quyền phiên người dùng, bỏ qua phân vùng đã mount và không ép ghi khi Windows đang ở trạng thái không an toàn.
+          Bản phát hành này củng cố pipeline remaster và kiểm tra phát hành: ISO Linux Mint gốc được đối chiếu SHA-256, output được kiểm tra lại trước khi upload và GitHub Release chỉ được tạo sau khi ISO cùng checksum đã được upload lên SourceForge.
 
           ### Tải ISO từ SourceForge
 
@@ -170,4 +194,7 @@ jobs:
           files: |
             output/installed-packages-mate.txt
             output/installed-packages-cinnamon.txt
+            output/flatpak-apps-mate.txt
+            output/flatpak-apps-cinnamon.txt
             output/*.iso.sha256
+          fail_on_unmatched_files: true
