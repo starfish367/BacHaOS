@@ -85,7 +85,11 @@ rm -f "${CHROOT}/tmp/customize.sh" "${CHROOT}/tmp/packages.list" "${CHROOT}/tmp/
 echo "==> Thu thập báo cáo gói"
 if chroot "$CHROOT" /usr/bin/env bash -c 'command -v flatpak' >/dev/null 2>&1; then
   chroot "$CHROOT" flatpak list --system --app --columns=application,name,version,size 2>/dev/null \
-    > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt"
+    > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt" || true
+  if [[ ! -s "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt" ]]; then
+    printf '%s\n' "Không có ứng dụng Flatpak được cài sẵn (${EDITION})" \
+      > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt"
+  fi
 else
   printf '%s\n' "Flatpak không có trong ISO gốc (${EDITION})" > "${OUTPUT_DIR}/flatpak-apps-${EDITION}.txt"
 fi
