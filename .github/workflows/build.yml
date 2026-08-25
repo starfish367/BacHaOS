@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Phiên bản phát hành (ví dụ: 0.1.3)"
+        description: "Phiên bản SemVer phát hành (ví dụ: 1.0.1)"
         required: true
-        default: "1.0.0"
+        default: "1.0.1"
 
 permissions:
   contents: write
@@ -55,7 +55,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             squashfs-tools xorriso isolinux syslinux-utils genisoimage rsync p7zip-full curl \
-            shellcheck desktop-file-utils
+            shellcheck desktop-file-utils yamllint
 
       - name: Download and verify Linux Mint base ISO (${{ matrix.edition.name }})
         run: |
@@ -78,6 +78,7 @@ jobs:
       - name: Lint remaster scripts
         run: |
           set -euo pipefail
+          yamllint .github/workflows/build.yml
           bash -n scripts/build.sh scripts/customize.sh
           shellcheck -x scripts/build.sh scripts/customize.sh \
             assets/bacha-os-hello/bacha-os-hello \
@@ -86,6 +87,7 @@ jobs:
             tests/test-bacha-os-hello.sh tests/test-bacha-os-ntfs-mount.sh
           desktop-file-validate assets/bacha-os-hello/*.desktop assets/onlyoffice-templates/*.desktop \
             assets/zalo/*.desktop assets/youtube/*.desktop
+          bash tests/test-build-assets.sh
           bash tests/test-bacha-os-hello.sh
           bash tests/test-bacha-os-ntfs-mount.sh
 
@@ -183,7 +185,7 @@ jobs:
           cat > release-notes.md <<EOF
           ## Bạc Hà OS ${{ github.event.inputs.version }}
 
-          Bản v1.0 bổ sung BacHa OS Hello: tự gắn NTFS bằng ntfs-3g tại /mnt/ocung1, /mnt/ocung2… với fallback chỉ đọc khi Windows đang hibernate; LibreOffice được cài theo yêu cầu để ISO gọn hơn; OnlyOffice có launcher/icon riêng; menu MATE/Cinnamon dùng nhận diện Bạc Hà OS. Pipeline vẫn đối chiếu SHA-256 ISO gốc, kiểm tra output trước upload và chỉ tạo release sau khi hai ISO cùng checksum có trên SourceForge.
+          Bản v${{ github.event.inputs.version }} là bản bảo trì phát hành lại theo pipeline đã được củng cố: BacHa OS Hello gắn NTFS bằng ntfs-3g với fallback chỉ đọc an toàn, LibreOffice cài theo yêu cầu, OnlyOffice có launcher/icon riêng và menu MATE/Cinnamon dùng nhận diện Bạc Hà OS. Pipeline đối chiếu SHA-256 ISO gốc, chạy lint/test/asset guard, kiểm tra output trước upload và chỉ tạo release sau khi hai ISO cùng checksum có trên SourceForge.
 
           ### Tải ISO từ SourceForge
 
