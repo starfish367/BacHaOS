@@ -6,7 +6,7 @@ on:
       version:
         description: "Phiên bản SemVer phát hành (ví dụ: 1.0.1)"
         required: true
-        default: "1.0.1"
+        default: "1.0.2"
 
 permissions:
   contents: write
@@ -40,7 +40,7 @@ jobs:
           - name: cinnamon
             iso_url: https://mirrors.edge.kernel.org/linuxmint/stable/22.3/linuxmint-22.3-cinnamon-64bit.iso
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Reclaim build disk space
         run: |
@@ -133,7 +133,7 @@ jobs:
             "${SF_USERNAME}@frs.sourceforge.net:/home/frs/project/bac-ha-os/"
 
       - name: Upload release reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: reports-${{ matrix.edition.name }}
           if-no-files-found: error
@@ -150,7 +150,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Download build reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v6
         with:
           path: output
           pattern: reports-*
@@ -198,7 +198,7 @@ jobs:
           EOF
 
       - name: Create GitHub Release with SourceForge links
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ github.event.inputs.version }}
           name: Bạc Hà OS v${{ github.event.inputs.version }}
