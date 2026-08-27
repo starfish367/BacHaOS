@@ -6,7 +6,7 @@ on:
       version:
         description: "Phiên bản SemVer phát hành (ví dụ: 1.0.1)"
         required: true
-        default: "1.0.2"
+        default: "1.0.3"
 
 permissions:
   contents: write
@@ -81,15 +81,18 @@ jobs:
           yamllint .github/workflows/build.yml
           bash -n scripts/build.sh scripts/customize.sh
           shellcheck -x scripts/build.sh scripts/customize.sh \
+            scripts/verify-sourceforge-public.sh \
             assets/bacha-os-hello/bacha-os-hello \
             assets/bacha-os-hello/bacha-os-ntfs-mount \
             assets/bacha-os-hello/bacha-os-install-libreoffice \
-            tests/test-bacha-os-hello.sh tests/test-bacha-os-ntfs-mount.sh
+            tests/test-bacha-os-hello.sh tests/test-bacha-os-ntfs-mount.sh \
+            tests/test-verify-sourceforge-public.sh
           desktop-file-validate assets/bacha-os-hello/*.desktop assets/onlyoffice-templates/*.desktop \
             assets/zalo/*.desktop assets/youtube/*.desktop
           bash tests/test-build-assets.sh
           bash tests/test-bacha-os-hello.sh
           bash tests/test-bacha-os-ntfs-mount.sh
+          bash tests/test-verify-sourceforge-public.sh
 
       - name: Run remaster script
         run: |
@@ -155,6 +158,12 @@ jobs:
           path: output
           pattern: reports-*
           merge-multiple: true
+
+      - name: Verify public SourceForge ISO links
+        run: |
+          set -euo pipefail
+          chmod +x scripts/verify-sourceforge-public.sh
+          scripts/verify-sourceforge-public.sh output
 
       - name: Build release notes
         run: |
