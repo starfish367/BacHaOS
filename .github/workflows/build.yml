@@ -62,17 +62,34 @@ jobs:
           set -euo pipefail
           ISO_URL='${{ matrix.edition.iso_url }}'
           ISO_NAME="$(basename "$ISO_URL")"
-          ISO_DIR="$(dirname "$ISO_URL")"
-          download() {
-            curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
-              --connect-timeout 30 --max-time 1800 --speed-time 120 --speed-limit 1024 \
-              --output "$2" "$1"
-          }
-          download "$ISO_URL" mint-base.iso
-          download "${ISO_DIR}/sha256sum.txt" sha256sum.txt
-          EXPECTED_SHA256="$(awk -v file="$ISO_NAME" '$2 == "*" file || $2 == file {print $1; exit}' sha256sum.txt)"
-          [[ "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]
-          printf '%s  %s\n' "$EXPECTED_SHA256" mint-base.iso | sha256sum --check --status --strict
+          MIRROR_DIRS=(
+            "$(dirname "$ISO_URL")"
+            "https://mirror.netcologne.de/linuxmint/iso/stable/22.3"
+            "https://mirror.ibcp.fr/pub/linuxmint/iso/stable/22.3"
+          )
+          verified=false
+          for mirror_dir in "${MIRROR_DIRS[@]}"; do
+            rm -f mint-base.iso sha256sum.txt
+            printf 'Trying Linux Mint mirror: %s\n' "$mirror_dir"
+            if ! curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
+              --connect-timeout 45 --max-time 1800 --speed-time 120 --speed-limit 1024 \
+              --output sha256sum.txt "${mirror_dir}/sha256sum.txt"; then
+              continue
+            fi
+            EXPECTED_SHA256="$(awk -v file="$ISO_NAME" '$2 == "*" file || $2 == file {print $1; exit}' sha256sum.txt)"
+            if [[ ! "$EXPECTED_SHA256" =~ ^[[:xdigit:]]{64}$ ]]; then
+              printf 'Missing checksum for %s on %s\n' "$ISO_NAME" "$mirror_dir" >&2
+              continue
+            fi
+            if curl --fail --location --retry 4 --retry-all-errors --retry-delay 5 \
+              --connect-timeout 45 --max-time 1800 --speed-time 120 --speed-limit 1024 \
+              --output mint-base.iso "${mirror_dir}/${ISO_NAME}" \
+              && printf '%s  %s\n' "$EXPECTED_SHA256" mint-base.iso | sha256sum --check --status --strict; then
+              verified=true
+              break
+            fi
+          done
+          "$verified"
           test "$(stat -c%s mint-base.iso)" -gt 1000000000
 
       - name: Lint remaster scripts
